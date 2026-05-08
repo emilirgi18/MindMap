@@ -1,12 +1,15 @@
 'use client'
 
+import { useRef } from 'react'
 import type { Editor } from '@tiptap/react'
 
 interface Props {
   editor: Editor
+  onImageFile?: (file: File) => void
 }
 
-export default function Toolbar({ editor }: Props) {
+export default function Toolbar({ editor, onImageFile }: Props) {
+  const fileInputRef = useRef<HTMLInputElement>(null)
   return (
     <div className="flex items-center gap-px px-4 py-1.5 border-b border-[#2a3347] flex-wrap flex-shrink-0 bg-[#161b27]/60">
       <Btn onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()} active={editor.isActive('heading', { level: 1 })} title="Heading 1">H1</Btn>
@@ -73,6 +76,30 @@ export default function Toolbar({ editor }: Props) {
           <line x1="3" y1="12" x2="21" y2="12" />
         </svg>
       </Btn>
+
+      {onImageFile && (
+        <>
+          <Sep />
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              if (file) onImageFile(file)
+              e.target.value = ''
+            }}
+          />
+          <Btn onClick={() => fileInputRef.current?.click()} title="Insert image">
+            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+              <rect x="3" y="3" width="18" height="18" rx="2" />
+              <circle cx="8.5" cy="8.5" r="1.5" />
+              <polyline points="21 15 16 10 5 21" />
+            </svg>
+          </Btn>
+        </>
+      )}
     </div>
   )
 }

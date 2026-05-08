@@ -10,7 +10,6 @@ import Collaboration from '@tiptap/extension-collaboration'
 import CollaborationCursor from '@tiptap/extension-collaboration-cursor'
 import { Markdown } from 'tiptap-markdown'
 import * as Y from 'yjs'
-import type { EditorView } from '@tiptap/pm/view'
 import { SupabaseProvider } from '@/lib/yjs/SupabaseProvider'
 import { fromBase64, toBase64, getUserColor } from '@/lib/yjs/utils'
 import { createClient } from '@/lib/supabase/client'
@@ -100,6 +99,7 @@ export default function NoteView({ note, role, profile }: Props) {
 
   const [title, setTitle] = useState(note.title)
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('saved')
+  const [imageError, setImageError] = useState<string | null>(null)
 
   const titleTimer = useRef<ReturnType<typeof setTimeout>>()
   const snapTimer = useRef<ReturnType<typeof setTimeout>>()
@@ -111,17 +111,29 @@ export default function NoteView({ note, role, profile }: Props) {
     const ed = editorRef.current
     if (!ed || ed.isDestroyed) return
     setSaveStatus('saving')
-    const yjsState = toBase64(Y.encodeStateAsUpdate(ydoc))
-    const body = ed.storage.markdown.getMarkdown() as string
-    const { error } = await supabase
-      .from('notes')
-      .update({ yjs_state: yjsState, body })
-      .eq('id', note.id)
-    if (!error) {
-      setSaveStatus('saved')
-      router.refresh()
+    try {
+      const yjsState = toBase64(Y.encodeStateAsUpdate(ydoc))
+      const body = ed.storage.markdown?.getMarkdown?.() ?? ''
+      const { error } = await supabase
+        .from('notes')
+        .update({ yjs_state: yjsState, body })
+        .eq('id', note.id)
+      if (error) {
+        console.error('Save failed:', error)
+        setSaveStatus('unsaved')
+      } else {
+        setSaveStatus('saved')
+        // No router.refresh() here — refreshing on every body save causes Next.js
+        // to remount the client component tree, which reinitialises the Yjs doc
+        // from the (possibly stale) DB snapshot and wipes unsaved content.
+        // The sidebar only needs updating when the title changes; that's handled
+        // by handleTitleChange which still calls router.refresh().
+      }
+    } catch (err) {
+      console.error('Save threw:', err)
+      setSaveStatus('unsaved')
     }
-  }, [ydoc, supabase, note.id, router])
+  }, [ydoc, supabase, note.id])
 
   // Debounce snapshot saves triggered by Y.Doc updates
   useEffect(() => {
@@ -141,38 +153,31 @@ export default function NoteView({ note, role, profile }: Props) {
     }
   }, [ydoc, flushSnapshot])
 
-  // Destroy the collab session when the component unmounts
-  useEffect(() => {
-    return () => {
-      if (activeCollab?.noteId === note.id) {
-        activeCollab.provider.destroy()
-        activeCollab.ydoc.destroy()
-        activeCollab = null
-      }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
   // ----- Image upload -------------------------------------------------------
 
   async function uploadImage(file: File): Promise<string> {
     const ext = file.name.split('.').pop() ?? 'png'
     const path = `${note.workspace_id}/images/${crypto.randomUUID()}.${ext}`
-    const { error } = await supabase.storage
+    const { error: uploadErr } = await supabase.storage
       .from('workspaces')
       .upload(path, file, { contentType: file.type })
-    if (error) throw error
-    // Signed URL valid for 1 year — stored verbatim in Markdown
-    const { data } = await supabase.storage
-      .from('workspaces')
-      .createSignedUrl(path, 60 * 60 * 24 * 365)
-    return data?.signedUrl ?? ''
+    if (uploadErr) throw uploadErr
+    const { data } = supabase.storage.from('workspaces').getPublicUrl(path)
+    return data.publicUrl
   }
 
-  function insertImage(view: EditorView, url: string, pos?: number) {
-    const { schema, tr } = view.state
-    const node = schema.nodes.image.create({ src: url })
-    view.dispatch(pos !== undefined ? tr.insert(pos, node) : tr.replaceSelectionWith(node))
+  async function insertImageUrl(url: string, pos?: number) {
+    const ed = editorRef.current
+    if (!ed || ed.isDestroyed || !url) return
+    if (pos !== undefined) {
+      ed.chain().focus().insertContentAt(pos, { type: 'image', attrs: { src: url } }).run()
+    } else {
+      ed.chain().focus().setImage({ src: url }).run()
+    }
+    // Save immediately — don't wait for the 2s debounce. The user might navigate
+    // away before it fires, losing the image.
+    clearTimeout(snapTimer.current)
+    await flushSnapshot()
   }
 
   // ----- TipTap editor ------------------------------------------------------
@@ -194,14 +199,16 @@ export default function NoteView({ note, role, profile }: Props) {
       attributes: {
         class: 'prose prose-invert max-w-none focus:outline-none min-h-[60vh] py-1',
       },
-      handlePaste(view, event) {
+      handlePaste(_view, event) {
         const items = Array.from(event.clipboardData?.items ?? [])
         const img = items.find((i) => i.type.startsWith('image/'))
         if (!img) return false
         event.preventDefault()
         const file = img.getAsFile()
         if (!file) return false
-        uploadImage(file).then((url) => url && insertImage(view, url)).catch(console.error)
+        uploadImage(file)
+          .then((url) => insertImageUrl(url))
+          .catch((err) => { console.error(err); setImageError('Image upload failed') })
         return true
       },
       handleDrop(view, event, _slice, moved) {
@@ -210,8 +217,10 @@ export default function NoteView({ note, role, profile }: Props) {
         const img = files.find((f) => f.type.startsWith('image/'))
         if (!img) return false
         event.preventDefault()
-        const coords = view.posAtCoords({ left: event.clientX, top: event.clientY })
-        uploadImage(img).then((url) => url && insertImage(view, url, coords?.pos)).catch(console.error)
+        const pos = view.posAtCoords({ left: event.clientX, top: event.clientY })?.pos
+        uploadImage(img)
+          .then((url) => insertImageUrl(url, pos))
+          .catch((err) => { console.error(err); setImageError('Image upload failed') })
         return true
       },
     },
@@ -303,7 +312,19 @@ export default function NoteView({ note, role, profile }: Props) {
       </div>
 
       {/* Formatting toolbar */}
-      {editor && <Toolbar editor={editor} />}
+      {editor && (
+        <Toolbar
+          editor={editor}
+          onImageFile={canEdit ? (file) => uploadImage(file).then((url) => insertImageUrl(url)).catch((err) => { console.error(err); setImageError('Image upload failed') }) : undefined}
+        />
+      )}
+
+      {imageError && (
+        <div className="mx-10 mb-2 px-3 py-2 rounded-md bg-red-900/40 text-red-300 text-xs flex items-center justify-between flex-shrink-0">
+          {imageError}
+          <button onClick={() => setImageError(null)} className="ml-2 hover:text-red-100">✕</button>
+        </div>
+      )}
 
       {/* Editor + links panel */}
       <div className="flex-1 overflow-y-auto px-10 py-4">
