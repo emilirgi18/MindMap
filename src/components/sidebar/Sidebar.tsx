@@ -8,11 +8,12 @@ import NoteTree from './NoteTree'
 import NewWorkspaceModal from './NewWorkspaceModal'
 import { useAppStore } from '@/store'
 import { signOut } from '@/lib/actions/auth'
-import type { WorkspaceWithRole, NoteListItem, UserProfile } from '@/lib/types'
+import type { WorkspaceWithRole, NoteListItem, FolderItem, UserProfile } from '@/lib/types'
 
 interface Props {
   workspaces: WorkspaceWithRole[]
   notes: NoteListItem[]
+  folders: FolderItem[]
   currentWorkspaceId: string
   currentRole: WorkspaceWithRole['role']
   profile: UserProfile
@@ -22,6 +23,7 @@ interface Props {
 export default function Sidebar({
   workspaces,
   notes,
+  folders,
   currentWorkspaceId,
   currentRole,
   profile,
@@ -118,6 +120,7 @@ export default function Sidebar({
         <div className="flex-1 min-h-0 overflow-y-auto">
           <NoteTree
             notes={notes}
+            folders={folders}
             workspaceId={currentWorkspaceId}
             currentRole={currentRole}
           />

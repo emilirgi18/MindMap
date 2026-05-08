@@ -78,6 +78,26 @@ export type Database = {
           joined_at?: string
         }
       }
+      folders: {
+        Row: {
+          id: string
+          workspace_id: string
+          name: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          workspace_id: string
+          name?: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          workspace_id?: string
+          name?: string
+          created_at?: string
+        }
+      }
       notes: {
         Row: {
           id: string
@@ -87,6 +107,7 @@ export type Database = {
           body: string
           dm_only: boolean
           yjs_state: string | null
+          folder_id: string | null
           created_at: string
           updated_at: string
         }
@@ -98,6 +119,7 @@ export type Database = {
           body?: string
           dm_only?: boolean
           yjs_state?: string | null
+          folder_id?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -109,6 +131,7 @@ export type Database = {
           body?: string
           dm_only?: boolean
           yjs_state?: string | null
+          folder_id?: string | null
           created_at?: string
           updated_at?: string
         }

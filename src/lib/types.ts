@@ -16,7 +16,13 @@ export interface NoteListItem {
   id: string
   title: string
   dm_only: boolean
+  folder_id: string | null
   updated_at: string
+}
+
+export interface FolderItem {
+  id: string
+  name: string
 }
 
 export interface UserProfile {

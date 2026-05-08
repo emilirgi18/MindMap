@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import Sidebar from '@/components/sidebar/Sidebar'
-import type { WorkspaceWithRole, NoteListItem, UserProfile } from '@/lib/types'
+import type { WorkspaceWithRole, NoteListItem, FolderItem, UserProfile } from '@/lib/types'
 
 export default async function WorkspaceLayout({
   children,
@@ -18,18 +18,23 @@ export default async function WorkspaceLayout({
   } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  // Parallel fetch: workspaces+roles, notes in current workspace, profile
-  const [membershipsRes, notesRes, profileRes] = await Promise.all([
+  // Parallel fetch: workspaces+roles, notes, folders, profile
+  const [membershipsRes, notesRes, foldersRes, profileRes] = await Promise.all([
     supabase
       .from('workspace_members')
       .select('role, workspaces(id, name, type, owner_id)')
       .eq('user_id', user.id),
     supabase
       .from('notes')
-      .select('id, title, dm_only, updated_at')
+      .select('id, title, dm_only, folder_id, updated_at')
       .eq('workspace_id', workspaceId)
       .order('updated_at', { ascending: false })
       .limit(200),
+    supabase
+      .from('folders')
+      .select('id, name')
+      .eq('workspace_id', workspaceId)
+      .order('created_at', { ascending: true }),
     supabase.from('profiles').select('id, full_name, email').eq('id', user.id).single(),
   ])
 
@@ -58,6 +63,7 @@ export default async function WorkspaceLayout({
   if (!current) redirect('/')
 
   const notes: NoteListItem[] = (notesRes.data ?? []) as NoteListItem[]
+  const folders: FolderItem[] = (foldersRes.data ?? []) as FolderItem[]
 
   const profile: UserProfile = profileRes.data ?? {
     id: user.id,
@@ -72,6 +78,7 @@ export default async function WorkspaceLayout({
       <Sidebar
         workspaces={workspaces}
         notes={notes}
+        folders={folders}
         currentWorkspaceId={workspaceId}
         currentRole={current.role}
         profile={profile}
