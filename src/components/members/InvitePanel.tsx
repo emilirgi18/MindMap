@@ -22,11 +22,17 @@ export default function InvitePanel({ invites, workspaceId, canManage }: Props) 
   const [creating, startCreate] = useTransition()
   const [revoking, startRevoke] = useTransition()
   const [copiedId, setCopiedId] = useState<string | null>(null)
+  const [createError, setCreateError] = useState<string | null>(null)
 
   function handleCreate() {
+    setCreateError(null)
     startCreate(async () => {
-      await createInvite(workspaceId)
-      router.refresh()
+      const result = await createInvite(workspaceId)
+      if (result.error) {
+        setCreateError(result.error)
+      } else {
+        router.refresh()
+      }
     })
   }
 
@@ -63,6 +69,10 @@ export default function InvitePanel({ invites, workspaceId, canManage }: Props) 
           </button>
         )}
       </div>
+
+      {createError && (
+        <p className="mb-2 text-xs text-red-400">{createError}</p>
+      )}
 
       {invites.length === 0 ? (
         <p className="text-xs text-gray-600 py-2">No active invite links.</p>

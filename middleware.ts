@@ -3,7 +3,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 import type { Database } from '@/lib/database.types'
 
 // Routes that bypass session + approval checks entirely
-const PUBLIC_PREFIXES = ['/login', '/pending', '/auth/', '/invite/']
+const PUBLIC_PREFIXES = ['/login', '/pending', '/auth/']
 
 function isPublic(pathname: string) {
   return PUBLIC_PREFIXES.some((p) => pathname.startsWith(p))
@@ -54,6 +54,12 @@ export async function middleware(request: NextRequest) {
     const loginUrl = new URL('/login', request.url)
     loginUrl.searchParams.set('next', pathname)
     return NextResponse.redirect(loginUrl)
+  }
+
+  // Invite redemption: authenticated but unapproved users must be able to reach
+  // /invite/[token] so the page can redeem the invite and approve them.
+  if (pathname.startsWith('/invite/')) {
+    return response
   }
 
   // Approval check — reads own profile row (always accessible via RLS)

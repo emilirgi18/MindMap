@@ -1,16 +1,22 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 
 interface Props {
   params: { token: string }
 }
 
 // Validates and redeems a workspace invite token, then redirects to the workspace.
-// If the user isn't logged in, middleware redirects them to /login?next=/invite/<token>
-// and they land here again after auth.
+// Unauthenticated users are redirected to /login?next=/invite/<token> by middleware
+// and land here again after auth. New (unapproved) users are auto-approved on redemption.
 export default async function InvitePage({ params }: Props) {
   const { token } = params
   const supabase = createClient()
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) redirect(`/login?next=/invite/${token}`)
 
   // Validate token is real before attempting redemption (gives a friendly error)
   const { data: invite, error: fetchError } = await supabase
@@ -38,6 +44,12 @@ export default async function InvitePage({ params }: Props) {
   if (redeemError) {
     return <InviteError message={redeemError.message} />
   }
+
+  // Auto-approve the user — they were explicitly invited, no manual review needed
+  await createAdminClient()
+    .from('profiles')
+    .update({ approved: true })
+    .eq('id', user.id)
 
   redirect(`/workspace/${workspaceId}`)
 }
