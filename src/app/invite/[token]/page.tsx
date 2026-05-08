@@ -46,8 +46,8 @@ export default async function InvitePage({ params }: Props) {
   }
 
   // Auto-approve the user — they were explicitly invited, no manual review needed
-  await createAdminClient()
-    .from('profiles')
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  await (createAdminClient().from('profiles') as any)
     .update({ approved: true })
     .eq('id', user.id)
 
