@@ -3,7 +3,7 @@ export function toBase64(bytes: Uint8Array): string {
   const CHUNK = 8192
   let result = ''
   for (let i = 0; i < bytes.length; i += CHUNK) {
-    result += String.fromCharCode(...bytes.subarray(i, i + CHUNK))
+    result += String.fromCharCode.apply(null, Array.from(bytes.subarray(i, i + CHUNK)))
   }
   return btoa(result)
 }
