@@ -7,6 +7,7 @@ import WorkspaceSwitcher from './WorkspaceSwitcher'
 import NoteTree from './NoteTree'
 import NewWorkspaceModal from './NewWorkspaceModal'
 import { useAppStore } from '@/store'
+import { signOut } from '@/lib/actions/auth'
 import type { WorkspaceWithRole, NoteListItem, UserProfile } from '@/lib/types'
 
 interface Props {
@@ -15,6 +16,7 @@ interface Props {
   currentWorkspaceId: string
   currentRole: WorkspaceWithRole['role']
   profile: UserProfile
+  isAdmin?: boolean
 }
 
 export default function Sidebar({
@@ -23,6 +25,7 @@ export default function Sidebar({
   currentWorkspaceId,
   currentRole,
   profile,
+  isAdmin,
 }: Props) {
   const [showNewWorkspace, setShowNewWorkspace] = useState(false)
   const { sidebarOpen, toggleSidebar } = useAppStore()
@@ -100,6 +103,15 @@ export default function Sidebar({
               Members
             </Link>
           )}
+          {isAdmin && (
+            <Link
+              href="/admin/users"
+              className="flex items-center gap-2 px-2 py-1.5 rounded-md text-xs font-medium text-gray-500 hover:text-gray-300 hover:bg-[#1c2333] transition-colors"
+            >
+              <AdminIcon />
+              Admin
+            </Link>
+          )}
         </div>
 
         {/* Note list — scrollable */}
@@ -116,9 +128,18 @@ export default function Sidebar({
           <div className="h-6 w-6 rounded-full bg-indigo-700 flex items-center justify-center text-xs font-medium text-white flex-shrink-0 select-none">
             {avatarChar}
           </div>
-          <span className="text-xs text-gray-400 truncate">
+          <span className="text-xs text-gray-400 truncate flex-1 min-w-0">
             {profile.full_name ?? profile.email}
           </span>
+          <form action={signOut}>
+            <button
+              type="submit"
+              title="Sign out"
+              className="p-1 rounded-md text-gray-600 hover:text-gray-300 hover:bg-[#1c2333] transition-colors flex-shrink-0"
+            >
+              <SignOutIcon />
+            </button>
+          </form>
         </div>
       </aside>
 
@@ -162,6 +183,23 @@ function ChevronRightIcon() {
   return (
     <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden>
       <path fillRule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clipRule="evenodd" />
+    </svg>
+  )
+}
+
+function AdminIcon() {
+  return (
+    <svg className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor" aria-hidden>
+      <path fillRule="evenodd" d="M9.661 2.237a.531.531 0 01.678 0 11.947 11.947 0 007.078 2.749.5.5 0 01.479.425c.069.52.104 1.05.104 1.589 0 5.162-3.26 9.563-7.834 11.256a.48.48 0 01-.332 0C5.26 16.563 2 12.162 2 7c0-.538.035-1.069.104-1.589a.5.5 0 01.48-.425 11.947 11.947 0 007.077-2.749z" clipRule="evenodd" />
+    </svg>
+  )
+}
+
+function SignOutIcon() {
+  return (
+    <svg className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor" aria-hidden>
+      <path fillRule="evenodd" d="M3 4.25A2.25 2.25 0 015.25 2h5.5A2.25 2.25 0 0113 4.25v2a.75.75 0 01-1.5 0v-2a.75.75 0 00-.75-.75h-5.5a.75.75 0 00-.75.75v11.5c0 .414.336.75.75.75h5.5a.75.75 0 00.75-.75v-2a.75.75 0 011.5 0v2A2.25 2.25 0 0110.75 18h-5.5A2.25 2.25 0 013 15.75V4.25z" clipRule="evenodd" />
+      <path fillRule="evenodd" d="M6 10a.75.75 0 01.75-.75h9.546l-1.048-.943a.75.75 0 111.004-1.114l2.5 2.25a.75.75 0 010 1.114l-2.5 2.25a.75.75 0 11-1.004-1.114l1.048-.943H6.75A.75.75 0 016 10z" clipRule="evenodd" />
     </svg>
   )
 }

@@ -1,39 +1,13 @@
 'use client'
 
-import { useState, Suspense } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
 function LoginForm() {
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [mode, setMode] = useState<'signin' | 'signup'>('signin')
-
-  const router = useRouter()
   const searchParams = useSearchParams()
   const next = searchParams.get('next') ?? '/'
   const supabase = createClient()
-
-  async function handleEmail(e: React.FormEvent) {
-    e.preventDefault()
-    setLoading(true)
-    setError(null)
-
-    const { error } =
-      mode === 'signin'
-        ? await supabase.auth.signInWithPassword({ email, password })
-        : await supabase.auth.signUp({ email, password })
-
-    if (error) {
-      setError(error.message)
-      setLoading(false)
-    } else {
-      router.push(next)
-      router.refresh()
-    }
-  }
 
   async function handleGoogle() {
     await supabase.auth.signInWithOAuth({
@@ -49,66 +23,7 @@ function LoginForm() {
       <div className="w-full max-w-md px-8 py-10 rounded-2xl bg-[#161b27] border border-[#2a3347] space-y-6">
         <div>
           <h1 className="text-2xl font-bold text-white tracking-tight">MindMap</h1>
-          <p className="mt-1 text-sm text-gray-400">
-            {mode === 'signin' ? 'Sign in to your account' : 'Create a new account'}
-          </p>
-        </div>
-
-        {error && (
-          <div className="px-4 py-3 rounded-lg bg-red-950/60 border border-red-800/60 text-red-300 text-sm">
-            {error}
-          </div>
-        )}
-
-        <form onSubmit={handleEmail} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1.5">
-              Email
-            </label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              placeholder="you@example.com"
-              className="w-full px-3 py-2 rounded-lg bg-[#0f1117] border border-[#2a3347] text-white placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1.5">
-              Password
-            </label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              placeholder="••••••••"
-              className="w-full px-3 py-2 rounded-lg bg-[#0f1117] border border-[#2a3347] text-white placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm"
-            />
-          </div>
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full py-2 px-4 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium transition-colors"
-          >
-            {loading
-              ? 'Loading…'
-              : mode === 'signin'
-              ? 'Sign in'
-              : 'Create account'}
-          </button>
-        </form>
-
-        <div className="relative">
-          <div className="absolute inset-0 flex items-center">
-            <div className="w-full border-t border-[#2a3347]" />
-          </div>
-          <div className="relative flex justify-center">
-            <span className="px-3 bg-[#161b27] text-xs text-gray-500">or</span>
-          </div>
+          <p className="mt-1 text-sm text-gray-400">Sign in to continue</p>
         </div>
 
         <button
@@ -118,30 +33,6 @@ function LoginForm() {
           <GoogleIcon />
           Continue with Google
         </button>
-
-        <p className="text-center text-sm text-gray-500">
-          {mode === 'signin' ? (
-            <>
-              No account?{' '}
-              <button
-                onClick={() => { setMode('signup'); setError(null) }}
-                className="text-indigo-400 hover:text-indigo-300 hover:underline"
-              >
-                Sign up
-              </button>
-            </>
-          ) : (
-            <>
-              Already have an account?{' '}
-              <button
-                onClick={() => { setMode('signin'); setError(null) }}
-                className="text-indigo-400 hover:text-indigo-300 hover:underline"
-              >
-                Sign in
-              </button>
-            </>
-          )}
-        </p>
       </div>
     </div>
   )
@@ -170,7 +61,6 @@ function GoogleIcon() {
   )
 }
 
-// useSearchParams requires Suspense in Next.js 14 App Router
 export default function LoginPage() {
   return (
     <Suspense>

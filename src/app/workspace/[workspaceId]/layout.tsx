@@ -65,6 +65,8 @@ export default async function WorkspaceLayout({
     email: user.email ?? '',
   }
 
+  const isAdmin = !!process.env.ADMIN_USER_ID && user.id === process.env.ADMIN_USER_ID
+
   return (
     <div className="h-screen flex overflow-hidden bg-[#0f1117]">
       <Sidebar
@@ -73,6 +75,7 @@ export default async function WorkspaceLayout({
         currentWorkspaceId={workspaceId}
         currentRole={current.role}
         profile={profile}
+        isAdmin={isAdmin}
       />
       <main className="flex-1 min-w-0 flex flex-col overflow-hidden">
         {children}
