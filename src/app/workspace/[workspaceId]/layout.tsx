@@ -44,7 +44,7 @@ export default async function WorkspaceLayout({
     } | null
   }
 
-  const workspaces: WorkspaceWithRole[] = ((membershipsRes.data ?? []) as MemberRow[])
+  const workspaces: WorkspaceWithRole[] = ((membershipsRes.data ?? []) as unknown as MemberRow[])
     .filter((m) => m.workspaces !== null)
     .map((m) => ({ ...(m.workspaces as NonNullable<MemberRow['workspaces']>), role: m.role }))
     .sort((a, b) => {
