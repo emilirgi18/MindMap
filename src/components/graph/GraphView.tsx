@@ -76,7 +76,17 @@ export default function GraphView({ nodes, links, workspaceId }: Props) {
   const graphData = { nodes, links }
 
   return (
-    <div ref={containerRef} className="w-full h-full bg-[#0f1117]">
+    <div ref={containerRef} className="relative w-full h-full bg-[#0f1117]">
+      <button
+        onClick={() => router.refresh()}
+        title="Refresh graph"
+        className="absolute top-4 right-4 z-10 flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-[#161b27]/80 border border-[#2a3347] text-xs text-gray-400 hover:text-gray-200 hover:bg-[#1c2333] transition-colors backdrop-blur-sm"
+      >
+        <svg className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+          <path fillRule="evenodd" d="M15.312 11.424a5.5 5.5 0 01-9.201 2.466l-.312-.311h2.433a.75.75 0 000-1.5H3.989a.75.75 0 00-.75.75v4.242a.75.75 0 001.5 0v-2.43l.31.31a7 7 0 0011.712-3.138.75.75 0 00-1.449-.39zm1.23-3.723a.75.75 0 00.219-.53V2.929a.75.75 0 00-1.5 0V5.36l-.31-.31A7 7 0 003.239 8.188a.75.75 0 101.448.389A5.5 5.5 0 0113.89 6.11l.311.31h-2.432a.75.75 0 000 1.5h4.243a.75.75 0 00.53-.219z" clipRule="evenodd" />
+        </svg>
+        Refresh
+      </button>
       {dimensions.width > 0 && (
         <ForceGraph3D
           graphData={graphData}

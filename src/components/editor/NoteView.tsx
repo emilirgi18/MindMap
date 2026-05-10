@@ -16,6 +16,7 @@ import { createClient } from '@/lib/supabase/client'
 import Toolbar from './Toolbar'
 import PresenceBar from './PresenceBar'
 import NoteLinksPanel from './NoteLinksPanel'
+import TagsPanel from './TagsPanel'
 
 interface NoteData {
   id: string
@@ -326,14 +327,25 @@ export default function NoteView({ note, role, profile }: Props) {
         </div>
       )}
 
-      {/* Editor + links panel */}
+      {/* Editor + bottom panels */}
       <div className="flex-1 overflow-y-auto px-10 py-4">
         <EditorContent editor={editor} />
-        <NoteLinksPanel
-          noteId={note.id}
-          workspaceId={note.workspace_id}
-          canEdit={canEdit}
-        />
+        <div className="mt-6 pt-5 border-t border-[#2a3347] flex gap-10">
+          <div className="flex-1 min-w-0">
+            <NoteLinksPanel
+              noteId={note.id}
+              workspaceId={note.workspace_id}
+              canEdit={canEdit}
+            />
+          </div>
+          <div className="w-56 flex-shrink-0">
+            <TagsPanel
+              noteId={note.id}
+              workspaceId={note.workspace_id}
+              canEdit={canEdit}
+            />
+          </div>
+        </div>
       </div>
     </div>
   )

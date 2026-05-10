@@ -23,11 +23,12 @@ export default async function GraphPage({
   })
   if (!role) notFound()
 
-  // Fetch notes (nodes) — capped at NODE_LIMIT
+  // Fetch notes (nodes) — capped at NODE_LIMIT, exclude soft-deleted
   const { data: notesData } = await supabase
     .from('notes')
     .select('id, title, dm_only')
     .eq('workspace_id', workspaceId)
+    .is('deleted_at', null)
     .order('updated_at', { ascending: false })
     .limit(NODE_LIMIT)
 

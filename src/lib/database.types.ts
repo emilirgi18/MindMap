@@ -83,18 +83,24 @@ export type Database = {
           id: string
           workspace_id: string
           name: string
+          parent_id: string | null
+          deleted_at: string | null
           created_at: string
         }
         Insert: {
           id?: string
           workspace_id: string
           name?: string
+          parent_id?: string | null
+          deleted_at?: string | null
           created_at?: string
         }
         Update: {
           id?: string
           workspace_id?: string
           name?: string
+          parent_id?: string | null
+          deleted_at?: string | null
           created_at?: string
         }
       }
@@ -108,6 +114,7 @@ export type Database = {
           dm_only: boolean
           yjs_state: string | null
           folder_id: string | null
+          deleted_at: string | null
           created_at: string
           updated_at: string
         }
@@ -120,6 +127,7 @@ export type Database = {
           dm_only?: boolean
           yjs_state?: string | null
           folder_id?: string | null
+          deleted_at?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -132,6 +140,7 @@ export type Database = {
           dm_only?: boolean
           yjs_state?: string | null
           folder_id?: string | null
+          deleted_at?: string | null
           created_at?: string
           updated_at?: string
         }

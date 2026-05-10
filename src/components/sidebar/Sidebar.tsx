@@ -105,15 +105,6 @@ export default function Sidebar({
               Members
             </Link>
           )}
-          {isAdmin && (
-            <Link
-              href="/admin/users"
-              className="flex items-center gap-2 px-2 py-1.5 rounded-md text-xs font-medium text-gray-500 hover:text-gray-300 hover:bg-[#1c2333] transition-colors"
-            >
-              <AdminIcon />
-              Admin
-            </Link>
-          )}
         </div>
 
         {/* Note list — scrollable */}
@@ -125,6 +116,19 @@ export default function Sidebar({
             currentRole={currentRole}
           />
         </div>
+
+        {/* Admin link — above user footer, only for designated admin */}
+        {isAdmin && (
+          <div className="px-2 py-1.5 border-t border-[#2a3347] flex-shrink-0">
+            <Link
+              href="/admin/users"
+              className="flex items-center gap-2 px-2 py-1.5 rounded-md text-xs font-medium text-gray-600 hover:text-gray-300 hover:bg-[#1c2333] transition-colors"
+            >
+              <AdminIcon />
+              Admin panel
+            </Link>
+          </div>
+        )}
 
         {/* User footer */}
         <div className="px-3 py-2.5 border-t border-[#2a3347] flex items-center gap-2 flex-shrink-0">

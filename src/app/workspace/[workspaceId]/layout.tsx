@@ -18,25 +18,38 @@ export default async function WorkspaceLayout({
   } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  // Parallel fetch: workspaces+roles, notes, folders, profile
-  const [membershipsRes, notesRes, foldersRes, profileRes] = await Promise.all([
+  // Parallel fetch: workspaces+roles, notes (stable columns), folder assignments, folders table, profile
+  const [membershipsRes, notesRes, noteFolderRes, foldersRes, profileRes] = await Promise.all([
     supabase
       .from('workspace_members')
       .select('role, workspaces(id, name, type, owner_id)')
       .eq('user_id', user.id),
+    // Stable columns — always succeeds even before the folders migration
     supabase
       .from('notes')
-      .select('id, title, dm_only, folder_id, updated_at')
+      .select('id, title, dm_only, updated_at')
       .eq('workspace_id', workspaceId)
       .order('updated_at', { ascending: false })
       .limit(200),
+    // folder_id column — only exists after migration; errors are silently ignored below
+    supabase
+      .from('notes')
+      .select('id, folder_id')
+      .eq('workspace_id', workspaceId),
+    // folders table — only exists after migration; errors are silently ignored below
     supabase
       .from('folders')
-      .select('id, name')
+      .select('id, name, parent_id')
       .eq('workspace_id', workspaceId)
       .order('created_at', { ascending: true }),
     supabase.from('profiles').select('id, full_name, email').eq('id', user.id).single(),
   ])
+
+  // Fetch tags for all notes in this workspace (used for tag-based search)
+  const allNoteIds = (notesRes.data ?? []).map((n) => n.id)
+  const tagsRes = allNoteIds.length > 0
+    ? await supabase.from('tags').select('note_id, name').in('note_id', allNoteIds)
+    : { data: [] }
 
   // Flatten the nested join result into WorkspaceWithRole[]
   type MemberRow = {
@@ -62,7 +75,22 @@ export default async function WorkspaceLayout({
   const current = workspaces.find((w) => w.id === workspaceId)
   if (!current) redirect('/')
 
-  const notes: NoteListItem[] = (notesRes.data ?? []) as NoteListItem[]
+  // Merge folder_id and tags into notes
+  const folderMap = new Map(
+    (noteFolderRes.data ?? []).map((n) => [n.id, (n as { id: string; folder_id?: string | null }).folder_id ?? null])
+  )
+  const tagsMap = new Map<string, string[]>()
+  for (const row of (tagsRes.data ?? [])) {
+    const r = row as { note_id: string; name: string }
+    const arr = tagsMap.get(r.note_id) ?? []
+    arr.push(r.name)
+    tagsMap.set(r.note_id, arr)
+  }
+  const notes: NoteListItem[] = (notesRes.data ?? []).map((n) => ({
+    ...(n as NoteListItem),
+    folder_id: folderMap.get(n.id) ?? null,
+    tags: tagsMap.get(n.id) ?? [],
+  }))
   const folders: FolderItem[] = (foldersRes.data ?? []) as FolderItem[]
 
   const profile: UserProfile = profileRes.data ?? {

@@ -18,11 +18,13 @@ export interface NoteListItem {
   dm_only: boolean
   folder_id: string | null
   updated_at: string
+  tags: string[]
 }
 
 export interface FolderItem {
   id: string
   name: string
+  parent_id: string | null
 }
 
 export interface UserProfile {

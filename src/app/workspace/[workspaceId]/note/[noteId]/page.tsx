@@ -20,6 +20,7 @@ export default async function NotePage({
       .from('notes')
       .select('id, title, body, yjs_state, workspace_id, dm_only')
       .eq('id', noteId)
+      .is('deleted_at', null)
       .single(),
     supabase.rpc('workspace_role', { p_workspace_id: workspaceId }),
     supabase

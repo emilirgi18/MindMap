@@ -140,7 +140,7 @@ export default function NoteLinksPanel({ noteId, workspaceId, canEdit }: Props) 
   }
 
   return (
-    <div className="mt-6 pt-5 border-t border-[#2a3347] space-y-4">
+    <div className="space-y-4">
 
       {/* Outgoing links */}
       <div>
