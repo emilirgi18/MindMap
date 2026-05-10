@@ -45,7 +45,7 @@ export default function TagsPanel({ noteId, workspaceId, canEdit }: Props) {
         .select('name')
         .in('note_id', noteIds)
 
-      const unique = [...new Set((tagData ?? []).map((t) => t.name))].sort()
+      const unique = Array.from(new Set((tagData ?? []).map((t) => t.name))).sort()
       setPool(unique)
     }
     loadPool()
