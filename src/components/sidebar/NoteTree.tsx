@@ -299,8 +299,8 @@ export default function NoteTree({ notes, folders, workspaceId, currentRole }: P
   const [dragItem, setDragItem] = useState<DragItem | null>(null)
   const [dropTarget, setDropTarget] = useState<DropTarget | null>(null)
   const editInputRef = useRef<HTMLInputElement>(null)
-  const canManage = currentRole === 'owner' || currentRole === 'dm'
-  const canSeeLock = canManage
+  const canManage = true
+  const canSeeLock = currentRole === 'owner' || currentRole === 'dm'
 
   useEffect(() => {
     setOpenFolders((prev) => {

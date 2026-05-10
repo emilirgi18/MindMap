@@ -45,14 +45,14 @@ export async function deleteFolder(
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return { error: 'Not authenticated' }
 
-    // Only owner/dm can manage folders
+    // Any workspace member can delete folders
     const { data: member } = await supabase
       .from('workspace_members')
       .select('role')
       .eq('workspace_id', workspaceId)
       .eq('user_id', user.id)
       .single()
-    if (!member || member.role === 'player') return { error: 'Only the owner or DM can delete folders' }
+    if (!member) return { error: 'Not a workspace member' }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const admin = createAdminClient() as any
