@@ -47,7 +47,8 @@ export async function deleteNote(noteId: string, workspaceId: string): Promise<{
       .single()
     if (!member) return { error: 'Not a workspace member' }
 
-    const admin = createAdminClient()
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const admin = createAdminClient() as any
 
     // Verify note belongs to this workspace and check dm_only restriction
     const { data: note } = await admin

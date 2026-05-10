@@ -54,7 +54,8 @@ export async function deleteFolder(
       .single()
     if (!member || member.role === 'player') return { error: 'Only the owner or DM can delete folders' }
 
-    const admin = createAdminClient()
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const admin = createAdminClient() as any
 
     const { data: folder } = await admin
       .from('folders')
