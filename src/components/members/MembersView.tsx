@@ -26,9 +26,9 @@ const ROLE_LABELS: Record<string, string> = {
 }
 
 const ROLE_COLORS: Record<string, string> = {
-  owner: 'text-amber-400 bg-amber-400/10',
-  dm: 'text-indigo-400 bg-indigo-400/10',
-  player: 'text-gray-400 bg-gray-400/10',
+  owner: 'text-orange-400 bg-orange-500/15',
+  dm: 'text-orange-300 bg-orange-500/10',
+  player: 'text-slate-400 bg-slate-700/50',
 }
 
 export default function MembersView({
@@ -41,7 +41,7 @@ export default function MembersView({
   const isOwner = currentRole === 'owner'
 
   return (
-    <div className="divide-y divide-[#2a3347]">
+    <div className="divide-y divide-[#334155]">
       {members.map((member) => (
         <MemberRow
           key={member.userId}
@@ -102,13 +102,13 @@ function MemberRow({
       {/* Name + email */}
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
-          <span className="text-sm text-gray-200 truncate">{displayName}</span>
+          <span className="text-sm text-slate-200 truncate">{displayName}</span>
           {isCurrentUser && (
-            <span className="text-xs text-gray-600">(you)</span>
+            <span className="text-xs text-slate-500">(you)</span>
           )}
         </div>
         {member.fullName && (
-          <span className="text-xs text-gray-600 truncate">{member.email}</span>
+          <span className="text-xs text-slate-500 truncate">{member.email}</span>
         )}
       </div>
 
@@ -118,7 +118,7 @@ function MemberRow({
           value={member.role}
           onChange={handleRoleChange}
           disabled={pending}
-          className="text-xs bg-[#1c2333] border border-[#2a3347] rounded-md px-2 py-1 text-gray-300 focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer"
+          className="text-xs bg-[#293548] border border-[#334155] rounded-md px-2 py-1 text-slate-200 focus:outline-none focus:ring-1 focus:ring-orange-500 cursor-pointer"
         >
           <option value="dm">DM</option>
           <option value="player">Player</option>
@@ -137,7 +137,7 @@ function MemberRow({
           onClick={handleKick}
           disabled={pending}
           title="Remove member"
-          className="p-1 rounded-md text-gray-600 hover:text-red-400 hover:bg-red-400/10 transition-colors disabled:opacity-50"
+          className="p-1 rounded-md text-slate-500 hover:text-red-400 hover:bg-red-400/10 transition-colors disabled:opacity-50"
         >
           <XIcon />
         </button>

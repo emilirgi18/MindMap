@@ -14,7 +14,7 @@ export interface InviteRow {
 interface Props {
   invites: InviteRow[]
   workspaceId: string
-  canManage: boolean // owner or dm
+  canManage: boolean
 }
 
 export default function InvitePanel({ invites, workspaceId, canManage }: Props) {
@@ -52,17 +52,17 @@ export default function InvitePanel({ invites, workspaceId, canManage }: Props) 
   }
 
   return (
-    <div className="px-6 py-5 border-t border-[#2a3347]">
+    <div className="px-6 py-5 border-t border-[#334155]">
       <div className="flex items-center justify-between mb-3">
         <div>
-          <h2 className="text-sm font-medium text-gray-300">Invite links</h2>
-          <p className="text-xs text-gray-600 mt-0.5">Links expire after 7 days and are single-use.</p>
+          <h2 className="text-sm font-medium text-slate-200">Invite links</h2>
+          <p className="text-xs text-slate-500 mt-0.5">Links expire after 7 days and are single-use.</p>
         </div>
         {canManage && (
           <button
             onClick={handleCreate}
             disabled={creating}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-medium transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-orange-500 hover:bg-orange-400 disabled:opacity-50 text-white text-xs font-semibold transition-colors"
           >
             <PlusIcon />
             {creating ? 'Creating…' : 'New invite'}
@@ -75,7 +75,7 @@ export default function InvitePanel({ invites, workspaceId, canManage }: Props) 
       )}
 
       {invites.length === 0 ? (
-        <p className="text-xs text-gray-600 py-2">No active invite links.</p>
+        <p className="text-xs text-slate-500 py-2">No active invite links.</p>
       ) : (
         <ul className="space-y-2">
           {invites.map((invite) => {
@@ -89,34 +89,30 @@ export default function InvitePanel({ invites, workspaceId, canManage }: Props) 
             return (
               <li
                 key={invite.id}
-                className="flex items-center gap-2 rounded-lg bg-[#1c2333] border border-[#2a3347] px-3 py-2"
+                className="flex items-center gap-2 rounded-lg bg-[#1e293b] border border-[#334155] px-3 py-2"
               >
-                {/* URL preview */}
-                <span className="flex-1 min-w-0 text-xs font-mono text-gray-400 truncate">
+                <span className="flex-1 min-w-0 text-xs font-mono text-slate-400 truncate">
                   …{url}
                 </span>
 
-                {/* Expiry */}
-                <span className="text-xs text-gray-600 flex-shrink-0 tabular-nums">
+                <span className="text-xs text-slate-500 flex-shrink-0 tabular-nums">
                   {daysLeft}d left
                 </span>
 
-                {/* Copy */}
                 <button
                   onClick={() => handleCopy(invite.token, invite.id)}
                   title="Copy link"
-                  className="p-1 rounded-md text-gray-500 hover:text-indigo-400 hover:bg-indigo-400/10 transition-colors flex-shrink-0"
+                  className="p-1 rounded-md text-slate-500 hover:text-orange-400 hover:bg-slate-700/40 transition-colors flex-shrink-0"
                 >
                   {isCopied ? <CheckIcon /> : <CopyIcon />}
                 </button>
 
-                {/* Revoke */}
                 {canManage && (
                   <button
                     onClick={() => handleRevoke(invite.id)}
                     disabled={revoking}
                     title="Revoke invite"
-                    className="p-1 rounded-md text-gray-600 hover:text-red-400 hover:bg-red-400/10 transition-colors disabled:opacity-50 flex-shrink-0"
+                    className="p-1 rounded-md text-slate-500 hover:text-red-400 hover:bg-red-400/10 transition-colors disabled:opacity-50 flex-shrink-0"
                   >
                     <XIcon />
                   </button>
@@ -149,7 +145,7 @@ function CopyIcon() {
 
 function CheckIcon() {
   return (
-    <svg className="h-3.5 w-3.5 text-green-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden>
+    <svg className="h-3.5 w-3.5 text-orange-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden>
       <path fillRule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clipRule="evenodd" />
     </svg>
   )

@@ -1,11 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import {
-  addNoteToTimeline,
-  removeNoteFromTimeline,
-  moveNoteToColumn,
-} from '@/lib/actions/kanban'
+import { addNoteToTimeline, removeNoteFromTimeline, moveNoteToColumn } from '@/lib/actions/kanban'
 import type { KanbanColumnItem } from '@/lib/types'
 
 interface Props {
@@ -16,13 +12,7 @@ interface Props {
   initialOnTimeline: boolean
 }
 
-export default function BoardPanel({
-  noteId,
-  workspaceId,
-  kanbanColumns,
-  initialKanbanColumnId,
-  initialOnTimeline,
-}: Props) {
+export default function BoardPanel({ noteId, workspaceId, kanbanColumns, initialKanbanColumnId, initialOnTimeline }: Props) {
   const [kanbanColumnId, setKanbanColumnId] = useState(initialKanbanColumnId)
   const [onTimeline, setOnTimeline] = useState(initialOnTimeline)
   const [showColumnPicker, setShowColumnPicker] = useState(false)
@@ -48,51 +38,43 @@ export default function BoardPanel({
 
   return (
     <div className="space-y-2">
-      <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Views</p>
+      <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Views</p>
 
-      {/* Timeline row */}
+      {/* Timeline */}
       <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-1.5 text-xs text-gray-500">
-          <TimelineIcon />
-          Timeline
+        <div className="flex items-center gap-1.5 text-xs text-slate-500">
+          <TimelineIcon /> Timeline
         </div>
         <button
           onClick={handleTimelineToggle}
           disabled={pending}
           className={`text-[11px] px-2 py-0.5 rounded transition-colors ${
             onTimeline
-              ? 'bg-indigo-600/20 text-indigo-400 hover:bg-red-900/20 hover:text-red-400'
-              : 'bg-[#1c2333] text-gray-500 hover:text-gray-300'
+              ? 'bg-orange-500/15 text-orange-400 hover:bg-red-900/20 hover:text-red-400'
+              : 'bg-[#293548] text-slate-500 hover:text-slate-200'
           }`}
         >
           {onTimeline ? 'Remove' : '+ Add'}
         </button>
       </div>
 
-      {/* Kanban row */}
+      {/* Kanban */}
       <div className="flex items-center justify-between gap-2 relative">
-        <div className="flex items-center gap-1.5 text-xs text-gray-500">
-          <KanbanIcon />
-          Kanban
+        <div className="flex items-center gap-1.5 text-xs text-slate-500">
+          <KanbanIcon /> Kanban
         </div>
-
         <div className="relative">
           {currentColumn ? (
             <div className="flex items-center gap-1">
               <button
                 onClick={() => setShowColumnPicker((v) => !v)}
                 disabled={pending}
-                className="text-[11px] px-2 py-0.5 rounded bg-indigo-600/20 text-indigo-400 hover:bg-indigo-600/30 transition-colors max-w-[90px] truncate"
-                style={{ borderLeft: `2px solid ${currentColumn.color ?? '#6366f1'}` }}
+                className="text-[11px] px-2 py-0.5 rounded bg-orange-500/15 text-orange-400 hover:bg-orange-500/25 transition-colors max-w-[90px] truncate"
+                style={{ borderLeft: `2px solid ${currentColumn.color ?? '#f97316'}` }}
               >
                 {currentColumn.name}
               </button>
-              <button
-                onClick={() => handleColumnSelect(null)}
-                disabled={pending}
-                className="text-gray-700 hover:text-red-400 transition-colors"
-                title="Remove from kanban"
-              >
+              <button onClick={() => handleColumnSelect(null)} disabled={pending} className="text-slate-600 hover:text-red-400 transition-colors" title="Remove from kanban">
                 <XIcon />
               </button>
             </div>
@@ -100,7 +82,7 @@ export default function BoardPanel({
             <button
               onClick={() => setShowColumnPicker((v) => !v)}
               disabled={pending || kanbanColumns.length === 0}
-              className="text-[11px] px-2 py-0.5 rounded bg-[#1c2333] text-gray-500 hover:text-gray-300 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              className="text-[11px] px-2 py-0.5 rounded bg-[#293548] text-slate-500 hover:text-slate-200 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
               title={kanbanColumns.length === 0 ? 'Create a column on the Kanban board first' : undefined}
             >
               + Add
@@ -108,19 +90,16 @@ export default function BoardPanel({
           )}
 
           {showColumnPicker && (
-            <div className="absolute right-0 top-6 z-20 bg-[#1c2333] border border-[#2a3347] rounded-lg shadow-xl min-w-[140px] py-1">
+            <div className="absolute right-0 top-6 z-20 bg-[#1e293b] border border-[#334155] rounded-lg shadow-xl min-w-[140px] py-1">
               {kanbanColumns.map((col) => (
                 <button
                   key={col.id}
                   onClick={() => handleColumnSelect(col.id)}
-                  className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-gray-300 hover:bg-[#2a3347] transition-colors text-left"
+                  className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-slate-300 hover:bg-slate-700/40 hover:text-white transition-colors text-left"
                 >
-                  <span
-                    className="w-2 h-2 rounded-full flex-shrink-0"
-                    style={{ backgroundColor: col.color ?? '#6366f1' }}
-                  />
+                  <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: col.color ?? '#f97316' }} />
                   <span className="truncate">{col.name}</span>
-                  {col.id === kanbanColumnId && <CheckIcon className="ml-auto flex-shrink-0 text-indigo-400" />}
+                  {col.id === kanbanColumnId && <CheckIcon className="ml-auto flex-shrink-0 text-orange-400" />}
                 </button>
               ))}
             </div>

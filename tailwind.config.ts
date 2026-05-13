@@ -12,12 +12,11 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        // App chrome
         surface: {
-          DEFAULT: '#0f1117',
-          raised: '#161b27',
-          overlay: '#1c2333',
-          border: '#2a3347',
+          DEFAULT: '#0f172a',   // slate-900
+          raised: '#1e293b',    // slate-800
+          overlay: '#293548',   // between slate-800/700
+          border: '#334155',    // slate-700
         },
       },
       fontFamily: {
@@ -27,13 +26,13 @@ const config: Config = {
       typography: {
         DEFAULT: {
           css: {
-            '--tw-prose-body': '#c9d1d9',
-            '--tw-prose-headings': '#e6edf3',
-            '--tw-prose-links': '#79c0ff',
-            '--tw-prose-bold': '#e6edf3',
-            '--tw-prose-code': '#f78166',
-            '--tw-prose-quotes': '#8b949e',
-            '--tw-prose-quote-borders': '#2a3347',
+            '--tw-prose-body': '#cbd5e1',
+            '--tw-prose-headings': '#f8fafc',
+            '--tw-prose-links': '#f97316',
+            '--tw-prose-bold': '#f8fafc',
+            '--tw-prose-code': '#fb923c',
+            '--tw-prose-quotes': '#94a3b8',
+            '--tw-prose-quote-borders': '#334155',
             maxWidth: 'none',
           },
         },

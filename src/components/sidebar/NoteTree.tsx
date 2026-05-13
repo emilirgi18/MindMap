@@ -83,15 +83,15 @@ function NoteRow({
       onDragStart={(e) => { e.stopPropagation(); e.dataTransfer.effectAllowed = 'move'; onDragStart({ type: 'note', id: note.id }) }}
       onDragEnd={onDragEnd}
     >
-      <div className={`flex items-center rounded-md transition-colors ${isActive ? 'bg-indigo-600/20' : 'hover:bg-[#1c2333]'}`}>
+      <div className={`flex items-center rounded-md transition-colors ${isActive ? 'bg-orange-500/12' : 'hover:bg-slate-700/40'}`}>
         <Link
           href={href}
           draggable={false}
-          className={`flex-1 min-w-0 flex flex-col px-2 py-1.5 text-sm ${isActive ? 'text-indigo-200' : 'text-gray-400 group-hover/note:text-gray-200'}`}
+          className={`flex-1 min-w-0 flex flex-col px-2 py-1.5 text-sm ${isActive ? 'text-orange-400' : 'text-slate-500 group-hover/note:text-slate-200'}`}
         >
           <span className="flex items-center gap-1.5">
             {canSeeLock && note.dm_only && (
-              <svg className="h-3 w-3 flex-shrink-0 text-amber-400" viewBox="0 0 20 20" fill="currentColor">
+              <svg className="h-3 w-3 flex-shrink-0 text-orange-400" viewBox="0 0 20 20" fill="currentColor">
                 <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
               </svg>
             )}
@@ -108,9 +108,9 @@ function NoteRow({
 
         {isConfirming ? (
           <div className="flex items-center gap-1 pr-1 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
-            <span className="text-[10px] text-gray-500">Delete?</span>
+            <span className="text-[10px] text-slate-500">Delete?</span>
             <button onClick={() => onDeleteNote(note.id)} className="text-[10px] px-1 rounded bg-red-600/80 hover:bg-red-600 text-white">Yes</button>
-            <button onClick={() => onConfirm(null)} className="text-[10px] px-1 rounded bg-[#2a3347] hover:bg-[#333f57] text-gray-300">No</button>
+            <button onClick={() => onConfirm(null)} className="text-[10px] px-1 rounded bg-[#293548] hover:bg-slate-600/50 text-slate-400">No</button>
           </div>
         ) : (
           <div className="flex items-center pr-1 opacity-0 group-hover/note:opacity-100 transition-opacity flex-shrink-0">
@@ -119,19 +119,19 @@ function NoteRow({
                 <button
                   onClick={(e) => { e.stopPropagation(); onSetMoving(isMoving ? null : note.id) }}
                   title="Move to folder"
-                  className="p-0.5 rounded text-gray-600 hover:text-gray-300 hover:bg-[#2a3347]"
+                  className="p-0.5 rounded text-slate-600 hover:text-orange-400 hover:bg-slate-700/40"
                 >
                   <FolderMoveIcon />
                 </button>
                 {isMoving && (
-                  <div className="absolute right-0 top-full mt-0.5 z-50 w-36 rounded-md bg-[#1c2333] border border-[#2a3347] shadow-lg py-1 text-xs">
+                  <div className="absolute right-0 top-full mt-0.5 z-50 w-36 rounded-md bg-[#1e293b] border border-[#334155] shadow-lg py-1 text-xs">
                     {note.folder_id !== null && (
-                      <button onClick={() => onMoveNote(note.id, null)} className="w-full text-left px-3 py-1.5 text-gray-400 hover:bg-[#2a3347] hover:text-gray-200">
+                      <button onClick={() => onMoveNote(note.id, null)} className="w-full text-left px-3 py-1.5 text-slate-400 hover:bg-slate-700/40 hover:text-slate-200">
                         No folder
                       </button>
                     )}
                     {folders.filter((f) => f.id !== note.folder_id).map((f) => (
-                      <button key={f.id} onClick={() => onMoveNote(note.id, f.id)} className="w-full text-left px-3 py-1.5 text-gray-400 hover:bg-[#2a3347] hover:text-gray-200 truncate">
+                      <button key={f.id} onClick={() => onMoveNote(note.id, f.id)} className="w-full text-left px-3 py-1.5 text-slate-400 hover:bg-slate-700/40 hover:text-slate-200 truncate">
                         {f.name}
                       </button>
                     ))}
@@ -142,7 +142,7 @@ function NoteRow({
             <button
               onClick={(e) => { e.stopPropagation(); onConfirm({ type: 'note', id: note.id }) }}
               title="Delete note"
-              className="p-0.5 rounded text-gray-600 hover:text-red-400 hover:bg-[#2a3347]"
+              className="p-0.5 rounded text-slate-600 hover:text-red-400 hover:bg-slate-700/40"
             >
               <XSmallIcon />
             </button>
@@ -217,8 +217,8 @@ function FolderRow({
         style={{ paddingLeft: indent }}
         className={`flex items-center gap-1 group/folder rounded-md pr-1 py-1 pl-1 transition-colors ${
           isDropTarget
-            ? 'bg-indigo-500/15 ring-1 ring-inset ring-indigo-500/40'
-            : 'hover:bg-[#1c2333]'
+            ? 'bg-orange-500/12 ring-1 ring-inset ring-orange-500/40'
+            : 'hover:bg-slate-700/40'
         }`}
         draggable
         onDragStart={(e) => { e.stopPropagation(); e.dataTransfer.effectAllowed = 'move'; onDragStart({ type: 'folder', id: node.id }) }}
@@ -226,7 +226,7 @@ function FolderRow({
         onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); onDragOverFolder(node.id) }}
         onDrop={(e) => { e.preventDefault(); e.stopPropagation(); onDropOnFolder(node.id) }}
       >
-        <button onClick={() => onToggle(node.id)} className="text-gray-600 hover:text-gray-300 flex-shrink-0 p-0.5">
+        <button onClick={() => onToggle(node.id)} className="text-slate-600 hover:text-orange-400 flex-shrink-0 p-0.5">
           <ChevronIcon open={isOpen} />
         </button>
 
@@ -241,38 +241,38 @@ function FolderRow({
               if (e.key === 'Escape') onCommitRename('')
             }}
             onClick={(e) => e.stopPropagation()}
-            className="flex-1 min-w-0 bg-[#2a3347] text-xs text-gray-200 rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            className="flex-1 min-w-0 bg-[#293548] text-xs text-slate-200 rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-orange-500"
           />
         ) : (
-          <button onDoubleClick={() => onStartRename(node)} className="flex-1 min-w-0 text-left text-xs font-medium text-gray-400 truncate">
+          <button onDoubleClick={() => onStartRename(node)} className="flex-1 min-w-0 text-left text-xs font-medium text-slate-400 truncate">
             {node.name}
           </button>
         )}
 
         {isConfirming ? (
           <div className="flex items-center gap-1 flex-shrink-0">
-            <span className="text-[10px] text-gray-500">Delete?</span>
+            <span className="text-[10px] text-slate-600">Delete?</span>
             <button onClick={() => onDeleteFolder(node.id)} className="text-[10px] px-1 rounded bg-red-600/80 hover:bg-red-600 text-white">Yes</button>
-            <button onClick={() => onConfirm(null)} className="text-[10px] px-1 rounded bg-[#2a3347] hover:bg-[#333f57] text-gray-300">No</button>
+            <button onClick={() => onConfirm(null)} className="text-[10px] px-1 rounded bg-[#293548] hover:bg-slate-600/50 text-slate-400">No</button>
           </div>
         ) : (
           canManage && (
             <div className="flex items-center gap-0.5 opacity-0 group-hover/folder:opacity-100 transition-opacity flex-shrink-0">
-              <button onClick={(e) => { e.stopPropagation(); onNewNote(node.id) }} title="New note" className="p-0.5 rounded text-gray-600 hover:text-gray-300 hover:bg-[#2a3347]"><PlusIcon /></button>
-              <button onClick={(e) => { e.stopPropagation(); onNewSubfolder(node.id) }} title="New subfolder" className="p-0.5 rounded text-gray-600 hover:text-gray-300 hover:bg-[#2a3347]"><FolderPlusIcon /></button>
-              <button onClick={(e) => { e.stopPropagation(); onConfirm({ type: 'folder', id: node.id }) }} title="Delete folder" className="p-0.5 rounded text-gray-600 hover:text-red-400 hover:bg-[#2a3347]"><XSmallIcon /></button>
+              <button onClick={(e) => { e.stopPropagation(); onNewNote(node.id) }} title="New note" className="p-0.5 rounded text-slate-600 hover:text-orange-400 hover:bg-slate-700/40"><PlusIcon /></button>
+              <button onClick={(e) => { e.stopPropagation(); onNewSubfolder(node.id) }} title="New subfolder" className="p-0.5 rounded text-slate-600 hover:text-orange-400 hover:bg-slate-700/40"><FolderPlusIcon /></button>
+              <button onClick={(e) => { e.stopPropagation(); onConfirm({ type: 'folder', id: node.id }) }} title="Delete folder" className="p-0.5 rounded text-slate-600 hover:text-red-400 hover:bg-slate-700/40"><XSmallIcon /></button>
             </div>
           )
         )}
       </div>
 
       {isOpen && (
-        <div style={{ paddingLeft: indent + 8 }} className="border-l border-[#2a3347] ml-3 mt-px space-y-px">
+        <div style={{ paddingLeft: indent + 8 }} className="border-l border-[#334155] ml-3 mt-px space-y-px">
           {node.notes.map((note) => (
             <NoteRow key={note.id} note={note} {...childProps} />
           ))}
           {node.notes.length === 0 && node.children.length === 0 && (
-            <p className="px-2 py-1 text-xs text-gray-700 italic">Empty</p>
+            <p className="px-2 py-1 text-xs text-slate-600 italic">Empty</p>
           )}
           {node.children.map((child) => (
             <FolderRow key={child.id} node={child} depth={depth + 1} {...childProps} />
@@ -468,12 +468,12 @@ export default function NoteTree({ notes, folders, workspaceId, currentRole }: P
     >
       {/* Header */}
       <div className="flex items-center justify-between px-2 py-1 mb-1">
-        <span className="text-[10px] font-semibold text-gray-600 uppercase tracking-widest">Notes</span>
+        <span className="text-[10px] font-semibold text-slate-600 uppercase tracking-widest">Notes</span>
         <div className="flex items-center gap-0.5">
           <button
             onClick={(e) => { e.stopPropagation(); router.refresh() }}
             title="Refresh"
-            className="p-0.5 rounded hover:bg-[#1c2333] text-gray-600 hover:text-gray-300 transition-colors"
+            className="p-0.5 rounded hover:bg-slate-700/40 text-slate-600 hover:text-orange-400 transition-colors"
           >
             <RefreshIcon spin={isPending} />
           </button>
@@ -482,7 +482,7 @@ export default function NoteTree({ notes, folders, workspaceId, currentRole }: P
               onClick={(e) => { e.stopPropagation(); handleNewFolder() }}
               disabled={isPending}
               title="New folder"
-              className="p-0.5 rounded hover:bg-[#1c2333] text-gray-500 hover:text-gray-300 transition-colors disabled:opacity-40"
+              className="p-0.5 rounded hover:bg-slate-700/40 text-slate-600 hover:text-orange-400 transition-colors disabled:opacity-40"
             >
               <FolderPlusIcon />
             </button>
@@ -492,7 +492,7 @@ export default function NoteTree({ notes, folders, workspaceId, currentRole }: P
             onClick={(e) => { e.stopPropagation(); handleNewNote() }}
             disabled={isPending}
             title="New note"
-            className="p-0.5 rounded hover:bg-[#1c2333] text-gray-500 hover:text-gray-300 transition-colors disabled:opacity-40"
+            className="p-0.5 rounded hover:bg-slate-700/40 text-slate-600 hover:text-orange-400 transition-colors disabled:opacity-40"
           >
             <PlusIcon />
           </button>
@@ -510,7 +510,7 @@ export default function NoteTree({ notes, folders, workspaceId, currentRole }: P
       {/* Search */}
       <div className="px-2 mb-1.5">
         <div className="relative">
-          <svg className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-gray-600 pointer-events-none" viewBox="0 0 20 20" fill="currentColor">
+          <svg className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-slate-600 pointer-events-none" viewBox="0 0 20 20" fill="currentColor">
             <path fillRule="evenodd" d="M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM2 9a7 7 0 1112.452 4.391l3.328 3.329a.75.75 0 11-1.06 1.06l-3.329-3.328A7 7 0 012 9z" clipRule="evenodd" />
           </svg>
           <input
@@ -518,10 +518,10 @@ export default function NoteTree({ notes, folders, workspaceId, currentRole }: P
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search notes…"
-            className="w-full bg-[#1c2333] rounded-md pl-6 pr-2 py-1 text-xs text-gray-300 placeholder-gray-600 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            className="w-full bg-[#293548] rounded-md pl-6 pr-2 py-1 text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-orange-500"
           />
           {query && (
-            <button onClick={() => setQuery('')} className="absolute right-1.5 top-1/2 -translate-y-1/2 text-gray-600 hover:text-gray-400">
+            <button onClick={() => setQuery('')} className="absolute right-1.5 top-1/2 -translate-y-1/2 text-slate-600 hover:text-orange-400">
               <XSmallIcon />
             </button>
           )}
@@ -531,7 +531,7 @@ export default function NoteTree({ notes, folders, workspaceId, currentRole }: P
       {/* Search results */}
       {filteredNotes ? (
         filteredNotes.length === 0 ? (
-          <p className="px-2 py-3 text-xs text-gray-600 text-center">No notes match.</p>
+          <p className="px-2 py-3 text-xs text-slate-600 text-center">No notes match.</p>
         ) : (
           <ul className="space-y-px">
             {filteredNotes.map((note) => {
@@ -543,8 +543,8 @@ export default function NoteTree({ notes, folders, workspaceId, currentRole }: P
         )
       ) : notes.length === 0 ? (
         <div className="px-2 py-6 text-center">
-          <p className="text-xs text-gray-600">No notes yet.</p>
-          <button onClick={() => handleNewNote()} className="mt-1 text-xs text-indigo-400 hover:underline">Create the first one</button>
+          <p className="text-xs text-slate-600">No notes yet.</p>
+          <button onClick={() => handleNewNote()} className="mt-1 text-xs text-orange-400 hover:underline">Create the first one</button>
         </div>
       ) : (
         <>
@@ -557,8 +557,8 @@ export default function NoteTree({ notes, folders, workspaceId, currentRole }: P
             <div
               className={`mx-1 my-1 rounded-md border border-dashed text-[10px] text-center py-1.5 transition-colors ${
                 isRootDropTarget
-                  ? 'border-indigo-500 bg-indigo-500/10 text-indigo-400'
-                  : 'border-[#2a3347] text-gray-700'
+                  ? 'border-orange-500 bg-orange-500/10 text-orange-400'
+                  : 'border-[#334155] text-slate-600'
               }`}
               onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setDropTarget('__root__') }}
               onDrop={(e) => { e.preventDefault(); e.stopPropagation(); handleDropOnRoot() }}

@@ -194,7 +194,7 @@ export default function KanbanView({ initialColumns, initialNotes, workspaceId }
         {/* Add column */}
         <div className="flex-shrink-0 w-64">
           {addingCol ? (
-            <div className="bg-[#161b27] border border-[#2a3347] rounded-lg p-3 flex flex-col gap-2">
+            <div className="bg-[#1e293b] border border-[#334155] rounded-lg p-3 flex flex-col gap-2">
               <input
                 value={newColName}
                 onChange={(e) => setNewColName(e.target.value)}
@@ -203,19 +203,19 @@ export default function KanbanView({ initialColumns, initialNotes, workspaceId }
                   if (e.key === 'Escape') { setAddingCol(false); setNewColName('') }
                 }}
                 placeholder="Column name…"
-                className="bg-[#0f1117] border border-[#2a3347] rounded px-2 py-1.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-indigo-500"
+                className="bg-[#0f172a] border border-[#334155] rounded px-2 py-1.5 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:border-orange-500"
                 autoFocus
               />
               <div className="flex gap-2">
                 <button
                   onClick={handleAddColumn}
-                  className="flex-1 px-2 py-1 rounded bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium transition-colors"
+                  className="flex-1 px-2 py-1 rounded bg-orange-500 hover:bg-orange-400 text-white text-xs font-semibold transition-colors"
                 >
                   Add
                 </button>
                 <button
                   onClick={() => { setAddingCol(false); setNewColName('') }}
-                  className="px-2 py-1 rounded text-gray-500 hover:text-gray-300 text-xs transition-colors"
+                  className="px-2 py-1 rounded text-slate-500 hover:text-slate-200 text-xs transition-colors"
                 >
                   Cancel
                 </button>
@@ -224,7 +224,7 @@ export default function KanbanView({ initialColumns, initialNotes, workspaceId }
           ) : (
             <button
               onClick={() => setAddingCol(true)}
-              className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg border border-dashed border-[#2a3347] text-gray-600 hover:text-gray-400 hover:border-gray-600 text-sm transition-colors"
+              className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg border border-dashed border-[#334155] text-slate-500 hover:text-orange-400 hover:border-orange-500/40 text-sm transition-colors"
             >
               <PlusIcon />
               Add column
@@ -241,8 +241,8 @@ export default function KanbanView({ initialColumns, initialNotes, workspaceId }
           const col = columns.find((c) => c.id === activeColumnId)
           return col ? (
             <div
-              className="w-64 bg-[#161b27] border border-indigo-500/50 rounded-lg px-3 py-2 shadow-xl opacity-90 text-sm font-medium text-gray-200"
-              style={{ borderTopColor: col.color ?? '#6366f1', borderTopWidth: 2 }}
+              className="w-64 bg-[#1e293b] border border-orange-500/40 rounded-lg px-3 py-2 shadow-xl opacity-90 text-sm font-medium text-slate-200"
+              style={{ borderTopColor: col.color ?? '#f97316', borderTopWidth: 2 }}
             >
               {col.name}
             </div>

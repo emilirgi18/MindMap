@@ -80,10 +80,10 @@ export default function TimelineView({ initialNotes, workspaceId }: Props) {
 
   if (notes.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center h-full gap-3 text-gray-600">
+      <div className="flex flex-col items-center justify-center h-full gap-3 text-slate-500">
         <TimelineIcon className="h-10 w-10 opacity-30" />
         <p className="text-sm">No events on the timeline yet.</p>
-        <p className="text-xs text-gray-700">Open a note and click &quot;Add to timeline&quot;.</p>
+        <p className="text-xs text-slate-600">Open a note and click &quot;Add to timeline&quot;.</p>
       </div>
     )
   }
@@ -97,14 +97,14 @@ export default function TimelineView({ initialNotes, workspaceId }: Props) {
     >
       <div className="relative h-full overflow-y-auto py-8">
         {/* Center spine */}
-        <div className="absolute left-1/2 top-0 bottom-0 w-px bg-[#2a3347] -translate-x-1/2 pointer-events-none" />
+        <div className="absolute left-1/2 top-0 bottom-0 w-px bg-[#334155] -translate-x-1/2 pointer-events-none" />
 
         {/* Refresh */}
         <div className="absolute top-3 right-4 z-10">
           <button
             onClick={() => router.refresh()}
             title="Refresh"
-            className="p-1 rounded hover:bg-[#1c2333] text-gray-600 hover:text-gray-300 transition-colors"
+            className="p-1 rounded hover:bg-slate-700/40 text-slate-500 hover:text-orange-400 transition-colors"
           >
             <RefreshIcon />
           </button>
@@ -160,10 +160,10 @@ function TimelineItem({
   }
 
   const card = (
-    <div className={`relative bg-[#161b27] border border-[#2a3347] rounded-lg overflow-hidden group/card ${isLeft ? 'mr-2' : 'ml-2'}`}>
+    <div className={`relative bg-[#1e293b] border border-[#334155] rounded-lg overflow-hidden group/card ${isLeft ? 'mr-2' : 'ml-2'}`}>
       {/* Connector notch */}
       <div
-        className={`absolute top-[18px] w-5 h-px bg-[#2a3347] ${
+        className={`absolute top-[18px] w-5 h-px bg-[#334155] ${
           isLeft ? '-right-[21px]' : '-left-[21px]'
         }`}
       />
@@ -173,7 +173,7 @@ function TimelineItem({
         <button
           {...attributes}
           {...listeners}
-          className="text-gray-700 hover:text-gray-400 cursor-grab active:cursor-grabbing flex-shrink-0 mt-0.5"
+          className="text-slate-600 hover:text-orange-400 cursor-grab active:cursor-grabbing flex-shrink-0 mt-0.5"
           title="Drag to reorder"
         >
           <GripIcon />
@@ -181,19 +181,19 @@ function TimelineItem({
         <div className="flex-1 min-w-0">
           <Link
             href={`/workspace/${workspaceId}/note/${note.id}`}
-            className="text-sm font-medium text-gray-200 hover:text-white line-clamp-2 leading-snug"
+            className="text-sm font-medium text-slate-200 hover:text-white line-clamp-2 leading-snug"
           >
             {note.title || 'Untitled'}
           </Link>
         </div>
         {note.dm_only && (
-          <span className="text-[10px] text-amber-400 font-medium flex-shrink-0 mt-0.5">DM</span>
+          <span className="text-[10px] text-orange-400 font-medium flex-shrink-0 mt-0.5">DM</span>
         )}
       </div>
 
       {/* Excerpt */}
       {excerpt(note.body) && (
-        <p className="px-3 pb-2 pl-8 text-xs text-gray-500 leading-relaxed line-clamp-3">
+        <p className="px-3 pb-2 pl-8 text-xs text-slate-500 leading-relaxed line-clamp-3">
           {excerpt(note.body)}
         </p>
       )}
@@ -202,12 +202,12 @@ function TimelineItem({
       {note.tags.length > 0 && (
         <div className="px-3 pb-3 pl-8 flex flex-wrap gap-1">
           {note.tags.slice(0, 4).map((tag) => (
-            <span key={tag} className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-600/20 text-indigo-400">
+            <span key={tag} className="text-[10px] px-1.5 py-0.5 rounded bg-orange-500/15 text-orange-400">
               {tag}
             </span>
           ))}
           {note.tags.length > 4 && (
-            <span className="text-[10px] text-gray-600">+{note.tags.length - 4}</span>
+            <span className="text-[10px] text-slate-500">+{note.tags.length - 4}</span>
           )}
         </div>
       )}
@@ -223,7 +223,7 @@ function TimelineItem({
 
       {/* Center dot */}
       <div className="flex-shrink-0 w-10 flex justify-center pt-[14px]">
-        <div className="w-3 h-3 rounded-full bg-indigo-500 border-2 border-[#0f1117] z-10" />
+        <div className="w-3 h-3 rounded-full bg-orange-500 border-2 border-[#0f172a] z-10" />
       </div>
 
       {/* Right half */}
@@ -236,10 +236,10 @@ function TimelineItem({
 
 function TimelineCardOverlay({ note }: { note: NoteListItem }) {
   return (
-    <div className="bg-[#161b27] border border-indigo-500/50 rounded-lg shadow-xl px-3 py-2.5 max-w-xs">
-      <span className="text-sm font-medium text-gray-200 line-clamp-1">{note.title || 'Untitled'}</span>
+    <div className="bg-[#1e293b] border border-orange-500/40 rounded-lg shadow-xl px-3 py-2.5 max-w-xs">
+      <span className="text-sm font-medium text-slate-200 line-clamp-1">{note.title || 'Untitled'}</span>
       {excerpt(note.body) && (
-        <p className="mt-1 text-xs text-gray-500 line-clamp-2">{excerpt(note.body)}</p>
+        <p className="mt-1 text-xs text-slate-500 line-clamp-2">{excerpt(note.body)}</p>
       )}
     </div>
   )

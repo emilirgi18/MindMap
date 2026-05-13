@@ -55,7 +55,7 @@ export default function PresenceBar({ provider }: Props) {
         <div
           key={i}
           title={user.name}
-          className="h-5 w-5 rounded-full flex items-center justify-center text-[10px] font-semibold text-white ring-2 ring-[#0f1117] select-none"
+          className="h-5 w-5 rounded-full flex items-center justify-center text-[10px] font-semibold text-white ring-2 ring-[#0f172a] select-none"
           style={{ backgroundColor: user.color }}
         >
           {user.name?.[0]?.toUpperCase() ?? '?'}

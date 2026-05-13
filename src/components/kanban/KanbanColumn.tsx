@@ -15,9 +15,9 @@ interface Props {
 }
 
 const PRESET_COLORS = [
-  '#6366f1', '#8b5cf6', '#ec4899', '#ef4444',
-  '#f97316', '#eab308', '#22c55e', '#14b8a6',
-  '#3b82f6', '#64748b',
+  '#f97316', '#fb923c', '#ef4444', '#22c55e',
+  '#14b8a6', '#8b5cf6', '#ec4899', '#3b82f6',
+  '#64748b', '#e2e8f0',
 ]
 
 export default function KanbanColumn({ column, notes, workspaceId }: Props) {
@@ -27,7 +27,6 @@ export default function KanbanColumn({ column, notes, workspaceId }: Props) {
   const [saving, setSaving] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
-  // Sortable for column reordering
   const {
     attributes: colAttrs,
     listeners: colListeners,
@@ -37,11 +36,10 @@ export default function KanbanColumn({ column, notes, workspaceId }: Props) {
     isDragging: isColDragging,
   } = useSortable({ id: column.id, data: { type: 'column' } })
 
-  // Droppable for accepting cards
   const { setNodeRef: setDropRef, isOver } = useDroppable({ id: column.id })
 
   const noteIds = notes.map((n) => n.id)
-  const accentColor = column.color ?? '#6366f1'
+  const accentColor = column.color ?? '#f97316'
 
   async function saveName() {
     const trimmed = name.trim()
@@ -76,14 +74,14 @@ export default function KanbanColumn({ column, notes, workspaceId }: Props) {
     >
       {/* Column header */}
       <div
-        className="flex items-center gap-2 px-3 py-2 rounded-t-lg border-t-2 bg-[#161b27] border-x border-[#2a3347]"
+        className="flex items-center gap-2 px-3 py-2 rounded-t-lg border-t-2 bg-[#1e293b] border-x border-[#334155]"
         style={{ borderTopColor: accentColor }}
       >
         {/* Drag handle */}
         <button
           {...colAttrs}
           {...colListeners}
-          className="text-gray-600 hover:text-gray-400 cursor-grab active:cursor-grabbing flex-shrink-0"
+          className="text-slate-600 hover:text-orange-400 cursor-grab active:cursor-grabbing flex-shrink-0"
           title="Drag to reorder column"
         >
           <GripIcon />
@@ -96,31 +94,31 @@ export default function KanbanColumn({ column, notes, workspaceId }: Props) {
             onChange={(e) => setName(e.target.value)}
             onBlur={saveName}
             onKeyDown={(e) => { if (e.key === 'Enter') saveName(); if (e.key === 'Escape') { setName(column.name); setEditing(false) } }}
-            className="flex-1 min-w-0 bg-transparent text-sm font-medium text-white focus:outline-none border-b border-indigo-500"
+            className="flex-1 min-w-0 bg-transparent text-sm font-medium text-slate-200 focus:outline-none border-b border-orange-500"
             disabled={saving}
             autoFocus
           />
         ) : (
           <button
             onDoubleClick={() => { setEditing(true); setTimeout(() => inputRef.current?.select(), 0) }}
-            className="flex-1 min-w-0 text-left text-sm font-medium text-gray-200 truncate"
+            className="flex-1 min-w-0 text-left text-sm font-medium text-slate-200 truncate"
             title="Double-click to rename"
           >
             {column.name}
           </button>
         )}
 
-        <span className="text-xs text-gray-600 flex-shrink-0">{notes.length}</span>
+        <span className="text-xs text-slate-500 flex-shrink-0">{notes.length}</span>
 
         <div className="relative flex-shrink-0">
           <button
             onClick={() => setShowColorPicker((v) => !v)}
-            className="w-3 h-3 rounded-full border border-[#2a3347] flex-shrink-0"
+            className="w-3 h-3 rounded-full border border-[#334155] flex-shrink-0"
             style={{ backgroundColor: accentColor }}
             title="Change color"
           />
           {showColorPicker && (
-            <div className="absolute right-0 top-5 z-20 bg-[#1c2333] border border-[#2a3347] rounded-lg p-2 shadow-xl flex flex-wrap gap-1.5 w-32">
+            <div className="absolute right-0 top-5 z-20 bg-[#1e293b] border border-[#334155] rounded-lg p-2 shadow-xl flex flex-wrap gap-1.5 w-32">
               {PRESET_COLORS.map((c) => (
                 <button
                   key={c}
@@ -135,7 +133,7 @@ export default function KanbanColumn({ column, notes, workspaceId }: Props) {
 
         <button
           onClick={handleDelete}
-          className="text-gray-700 hover:text-red-400 transition-colors flex-shrink-0"
+          className="text-slate-600 hover:text-red-400 transition-colors flex-shrink-0"
           title="Delete column"
         >
           <TrashIcon />
@@ -145,8 +143,8 @@ export default function KanbanColumn({ column, notes, workspaceId }: Props) {
       {/* Cards area */}
       <div
         ref={setDropRef}
-        className={`flex-1 min-h-[120px] flex flex-col gap-2 p-2 rounded-b-lg border border-t-0 border-[#2a3347] transition-colors ${
-          isOver ? 'bg-indigo-500/5' : 'bg-[#0f1117]/60'
+        className={`flex-1 min-h-[120px] flex flex-col gap-2 p-2 rounded-b-lg border border-t-0 border-[#334155] transition-colors ${
+          isOver ? 'bg-orange-500/5' : 'bg-[#0f172a]/60'
         }`}
       >
         <SortableContext items={noteIds} strategy={verticalListSortingStrategy}>

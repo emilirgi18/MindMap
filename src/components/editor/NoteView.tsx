@@ -47,12 +47,6 @@ interface Props {
 
 type SaveStatus = 'saved' | 'saving' | 'unsaved'
 
-// ---------------------------------------------------------------------------
-// Stable collab objects: Y.Doc + SupabaseProvider
-// Created once per (note.id), destroyed on note change or unmount.
-// Initialised synchronously before any hook so they are available to useEditor.
-// ---------------------------------------------------------------------------
-
 interface CollabState {
   noteId: string
   ydoc: Y.Doc
@@ -61,47 +55,22 @@ interface CollabState {
 
 let activeCollab: CollabState | null = null
 
-function getOrCreateCollab(
-  note: NoteData,
-  profile: UserProfile
-): CollabState {
-  // Reuse if same note, otherwise tear down and recreate
+function getOrCreateCollab(note: NoteData, profile: UserProfile): CollabState {
   if (activeCollab && activeCollab.noteId === note.id) return activeCollab
-
   activeCollab?.provider.destroy()
   activeCollab?.ydoc.destroy()
-
   const ydoc = new Y.Doc()
-
-  // Restore snapshot from DB if it exists; otherwise the doc starts empty
-  if (note.yjs_state) {
-    Y.applyUpdate(ydoc, fromBase64(note.yjs_state))
-  }
-
+  if (note.yjs_state) Y.applyUpdate(ydoc, fromBase64(note.yjs_state))
   const supabase = createClient()
-  const provider = new SupabaseProvider({
-    doc: ydoc,
-    supabase,
-    channelName: note.id,
-  })
-  provider.setUser({
-    name: profile.full_name ?? profile.email,
-    color: getUserColor(profile.id),
-  })
-
+  const provider = new SupabaseProvider({ doc: ydoc, supabase, channelName: note.id })
+  provider.setUser({ name: profile.full_name ?? profile.email, color: getUserColor(profile.id) })
   activeCollab = { noteId: note.id, ydoc, provider }
   return activeCollab
 }
 
-// ---------------------------------------------------------------------------
-// Component
-// ---------------------------------------------------------------------------
-
 export default function NoteView({ note, role, profile, kanbanColumns = [] }: Props) {
   const router = useRouter()
   const supabase = createClient()
-
-  // Collab objects — stable across re-renders for the same note
   const { ydoc, provider } = getOrCreateCollab(note, profile)
 
   const [title, setTitle] = useState(note.title)
@@ -118,10 +87,8 @@ export default function NoteView({ note, role, profile, kanbanColumns = [] }: Pr
   }
 
   const titleTimer = useRef<ReturnType<typeof setTimeout>>()
-  const snapTimer = useRef<ReturnType<typeof setTimeout>>()
-  const editorRef = useRef<ReturnType<typeof useEditor>>(null)
-
-  // ----- Snapshot flush (Yjs → Postgres) -----------------------------------
+  const snapTimer  = useRef<ReturnType<typeof setTimeout>>()
+  const editorRef  = useRef<ReturnType<typeof useEditor>>(null)
 
   const flushSnapshot = useCallback(async () => {
     const ed = editorRef.current
@@ -130,56 +97,31 @@ export default function NoteView({ note, role, profile, kanbanColumns = [] }: Pr
     try {
       const yjsState = toBase64(Y.encodeStateAsUpdate(ydoc))
       const body = ed.storage.markdown?.getMarkdown?.() ?? ''
-      const { error } = await supabase
-        .from('notes')
-        .update({ yjs_state: yjsState, body })
-        .eq('id', note.id)
-      if (error) {
-        console.error('Save failed:', error)
-        setSaveStatus('unsaved')
-      } else {
-        setSaveStatus('saved')
-        // No router.refresh() here — refreshing on every body save causes Next.js
-        // to remount the client component tree, which reinitialises the Yjs doc
-        // from the (possibly stale) DB snapshot and wipes unsaved content.
-        // The sidebar only needs updating when the title changes; that's handled
-        // by handleTitleChange which still calls router.refresh().
-      }
+      const { error } = await supabase.from('notes').update({ yjs_state: yjsState, body }).eq('id', note.id)
+      setSaveStatus(error ? 'unsaved' : 'saved')
+      if (error) console.error('Save failed:', error)
     } catch (err) {
       console.error('Save threw:', err)
       setSaveStatus('unsaved')
     }
   }, [ydoc, supabase, note.id])
 
-  // Debounce snapshot saves triggered by Y.Doc updates
   useEffect(() => {
-    function handleDocUpdate(_update: Uint8Array, origin: unknown) {
-      if (origin === 'remote') {
-        // Remote update — still needs to be snapshotted eventually
-      }
+    function handleDocUpdate() {
       setSaveStatus('unsaved')
       clearTimeout(snapTimer.current)
       snapTimer.current = setTimeout(flushSnapshot, 2000)
     }
-
     ydoc.on('update', handleDocUpdate)
-    return () => {
-      ydoc.off('update', handleDocUpdate)
-      clearTimeout(snapTimer.current)
-    }
+    return () => { ydoc.off('update', handleDocUpdate); clearTimeout(snapTimer.current) }
   }, [ydoc, flushSnapshot])
-
-  // ----- Image upload -------------------------------------------------------
 
   async function uploadImage(file: File): Promise<string> {
     const ext = file.name.split('.').pop() ?? 'png'
     const path = `${note.workspace_id}/images/${crypto.randomUUID()}.${ext}`
-    const { error: uploadErr } = await supabase.storage
-      .from('workspaces')
-      .upload(path, file, { contentType: file.type })
+    const { error: uploadErr } = await supabase.storage.from('workspaces').upload(path, file, { contentType: file.type })
     if (uploadErr) throw uploadErr
-    const { data } = supabase.storage.from('workspaces').getPublicUrl(path)
-    return data.publicUrl
+    return supabase.storage.from('workspaces').getPublicUrl(path).data.publicUrl
   }
 
   async function insertImageUrl(url: string, pos?: number) {
@@ -190,31 +132,22 @@ export default function NoteView({ note, role, profile, kanbanColumns = [] }: Pr
     } else {
       ed.chain().focus().setImage({ src: url }).run()
     }
-    // Save immediately — don't wait for the 2s debounce. The user might navigate
-    // away before it fires, losing the image.
     clearTimeout(snapTimer.current)
     await flushSnapshot()
   }
 
-  // ----- TipTap editor ------------------------------------------------------
-
   const editor = useEditor({
     immediatelyRender: false,
     extensions: [
-      // Disable built-in history — Yjs provides undo/redo via Y.UndoManager
       StarterKit.configure({ history: false }),
       Markdown.configure({ html: false, tightLists: true, bulletListMarker: '-' }),
       ImageExt.configure({ inline: false, allowBase64: false }),
       Placeholder.configure({ placeholder: 'Start writing…' }),
-      // Bind editor to the shared Y.Doc (uses the default XML fragment)
       Collaboration.configure({ document: ydoc }),
-      // Show remote cursors
       CollaborationCursor.configure({ provider }),
     ],
     editorProps: {
-      attributes: {
-        class: 'prose prose-invert max-w-none focus:outline-none min-h-[60vh] py-1',
-      },
+      attributes: { class: 'prose prose-invert max-w-none focus:outline-none min-h-[60vh] py-1' },
       handlePaste(_view, event) {
         const items = Array.from(event.clipboardData?.items ?? [])
         const img = items.find((i) => i.type.startsWith('image/'))
@@ -222,9 +155,7 @@ export default function NoteView({ note, role, profile, kanbanColumns = [] }: Pr
         event.preventDefault()
         const file = img.getAsFile()
         if (!file) return false
-        uploadImage(file)
-          .then((url) => insertImageUrl(url))
-          .catch((err) => { console.error(err); setImageError('Image upload failed') })
+        uploadImage(file).then((url) => insertImageUrl(url)).catch((err) => { console.error(err); setImageError('Image upload failed') })
         return true
       },
       handleDrop(view, event, _slice, moved) {
@@ -234,34 +165,15 @@ export default function NoteView({ note, role, profile, kanbanColumns = [] }: Pr
         if (!img) return false
         event.preventDefault()
         const pos = view.posAtCoords({ left: event.clientX, top: event.clientY })?.pos
-        uploadImage(img)
-          .then((url) => insertImageUrl(url, pos))
-          .catch((err) => { console.error(err); setImageError('Image upload failed') })
+        uploadImage(img).then((url) => insertImageUrl(url, pos)).catch((err) => { console.error(err); setImageError('Image upload failed') })
         return true
       },
     },
   })
 
-  // Keep editorRef in sync so flushSnapshot can read the editor without deps
-  useEffect(() => {
-    editorRef.current = editor
-  }, [editor])
-
-  // Bootstrap editor from Markdown body if there is no Yjs snapshot yet
-  // (handles notes created before Yjs was enabled)
-  useEffect(() => {
-    if (!editor || note.yjs_state || !note.body) return
-    editor.commands.setContent(note.body)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editor])
-
-  // Reset title when navigating between notes
-  useEffect(() => {
-    setTitle(note.title)
-    setSaveStatus('saved')
-  }, [note.id, note.title])
-
-  // ----- Title handler ------------------------------------------------------
+  useEffect(() => { editorRef.current = editor }, [editor])
+  useEffect(() => { if (!editor || note.yjs_state || !note.body) return; editor.commands.setContent(note.body) }, [editor]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { setTitle(note.title); setSaveStatus('saved') }, [note.id, note.title])
 
   function handleTitleChange(e: React.ChangeEvent<HTMLInputElement>) {
     const val = e.target.value
@@ -276,13 +188,8 @@ export default function NoteView({ note, role, profile, kanbanColumns = [] }: Pr
   }
 
   function handleTitleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (e.key === 'Enter') {
-      e.preventDefault()
-      editor?.commands.focus('start')
-    }
+    if (e.key === 'Enter') { e.preventDefault(); editor?.commands.focus('start') }
   }
-
-  // ----- Render -------------------------------------------------------------
 
   const canEdit = role !== 'player' || !note.dm_only
 
@@ -298,46 +205,32 @@ export default function NoteView({ note, role, profile, kanbanColumns = [] }: Pr
             onKeyDown={handleTitleKeyDown}
             disabled={!canEdit}
             placeholder="Untitled"
-            className="flex-1 min-w-0 bg-transparent text-3xl font-bold text-white placeholder-gray-700 focus:outline-none disabled:cursor-default"
+            className="flex-1 min-w-0 bg-transparent text-3xl font-bold text-white placeholder-slate-700 focus:outline-none disabled:cursor-default"
           />
           <div className="flex items-center gap-3 pt-2.5 flex-shrink-0">
             {(canToggleDm || dmOnly) && (
               <div className="flex items-center gap-1.5" title={canToggleDm ? (dmOnly ? 'DM only — click to make visible to all' : 'Click to make DM-only') : 'DM only'}>
-                <LockIcon className={`h-3 w-3 flex-shrink-0 ${dmOnly ? 'text-amber-400' : 'text-gray-600'}`} />
-                <span className={`text-xs ${dmOnly ? 'text-amber-400' : 'text-gray-600'}`}>DM only</span>
+                <LockIcon className={`h-3 w-3 flex-shrink-0 ${dmOnly ? 'text-orange-400' : 'text-slate-600'}`} />
+                <span className={`text-xs ${dmOnly ? 'text-orange-400' : 'text-slate-600'}`}>DM only</span>
                 {canToggleDm && (
                   <button
                     role="switch"
                     aria-checked={dmOnly}
                     onClick={handleDmToggle}
                     className={`relative inline-flex h-4 w-7 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-150 focus:outline-none ${
-                      dmOnly ? 'bg-amber-500' : 'bg-[#2a3347]'
+                      dmOnly ? 'bg-orange-500' : 'bg-slate-700'
                     }`}
                   >
-                    <span
-                      className={`inline-block h-3 w-3 rounded-full bg-white shadow transition-transform duration-150 ${
-                        dmOnly ? 'translate-x-3' : 'translate-x-0'
-                      }`}
-                    />
+                    <span className={`inline-block h-3 w-3 rounded-full bg-white shadow transition-transform duration-150 ${dmOnly ? 'translate-x-3' : 'translate-x-0'}`} />
                   </button>
                 )}
               </div>
             )}
             <PresenceBar provider={provider} />
-            <span
-              className={`text-xs tabular-nums transition-colors ${
-                saveStatus === 'saved'
-                  ? 'text-gray-700'
-                  : saveStatus === 'saving'
-                  ? 'text-gray-500'
-                  : 'text-amber-500/80'
-              }`}
-            >
-              {saveStatus === 'saved'
-                ? 'Saved'
-                : saveStatus === 'saving'
-                ? 'Saving…'
-                : 'Unsaved'}
+            <span className={`text-xs tabular-nums transition-colors ${
+              saveStatus === 'saved' ? 'text-slate-600' : saveStatus === 'saving' ? 'text-slate-500' : 'text-orange-500/80'
+            }`}>
+              {saveStatus === 'saved' ? 'Saved' : saveStatus === 'saving' ? 'Saving…' : 'Unsaved'}
             </span>
           </div>
         </div>
@@ -361,20 +254,12 @@ export default function NoteView({ note, role, profile, kanbanColumns = [] }: Pr
       {/* Editor + bottom panels */}
       <div className="flex-1 overflow-y-auto px-10 py-4">
         <EditorContent editor={editor} />
-        <div className="mt-6 pt-5 border-t border-[#2a3347] flex gap-10">
+        <div className="mt-6 pt-5 border-t border-[#334155] flex gap-10">
           <div className="flex-1 min-w-0">
-            <NoteLinksPanel
-              noteId={note.id}
-              workspaceId={note.workspace_id}
-              canEdit={canEdit}
-            />
+            <NoteLinksPanel noteId={note.id} workspaceId={note.workspace_id} canEdit={canEdit} />
           </div>
           <div className="w-56 flex-shrink-0 flex flex-col gap-6">
-            <TagsPanel
-              noteId={note.id}
-              workspaceId={note.workspace_id}
-              canEdit={canEdit}
-            />
+            <TagsPanel noteId={note.id} workspaceId={note.workspace_id} canEdit={canEdit} />
             <BoardPanel
               noteId={note.id}
               workspaceId={note.workspace_id}

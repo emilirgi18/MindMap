@@ -9,41 +9,28 @@ interface Props {
   onNewCampaign: () => void
 }
 
-export default function WorkspaceSwitcher({
-  workspaces,
-  currentWorkspaceId,
-  onNewCampaign,
-}: Props) {
+export default function WorkspaceSwitcher({ workspaces, currentWorkspaceId, onNewCampaign }: Props) {
   const personal = workspaces.find((w) => w.type === 'personal')
   const campaigns = workspaces.filter((w) => w.type === 'campaign')
 
   return (
-    <div className="px-2 py-2 border-b border-[#2a3347] space-y-0.5">
-      {personal && (
-        <WorkspaceRow
-          workspace={personal}
-          isActive={personal.id === currentWorkspaceId}
-        />
-      )}
+    <div className="px-2 py-2 border-b border-[#334155] space-y-0.5">
+      {personal && <WorkspaceRow workspace={personal} isActive={personal.id === currentWorkspaceId} />}
 
       {campaigns.length > 0 && (
         <>
-          <p className="px-2 pt-2 pb-0.5 text-[10px] font-semibold text-gray-600 uppercase tracking-widest">
+          <p className="px-2 pt-2 pb-0.5 text-[10px] font-semibold text-slate-600 uppercase tracking-widest">
             Campaigns
           </p>
           {campaigns.map((ws) => (
-            <WorkspaceRow
-              key={ws.id}
-              workspace={ws}
-              isActive={ws.id === currentWorkspaceId}
-            />
+            <WorkspaceRow key={ws.id} workspace={ws} isActive={ws.id === currentWorkspaceId} />
           ))}
         </>
       )}
 
       <button
         onClick={onNewCampaign}
-        className="flex items-center gap-2 w-full px-2 py-1.5 rounded-md text-xs text-gray-500 hover:text-gray-300 hover:bg-[#1c2333] transition-colors"
+        className="flex items-center gap-2 w-full px-2 py-1.5 rounded-md text-sm text-slate-500 hover:text-slate-100 hover:bg-slate-700/40 transition-colors"
       >
         <PlusIcon className="h-3.5 w-3.5 flex-shrink-0" />
         New campaign
@@ -52,32 +39,22 @@ export default function WorkspaceSwitcher({
   )
 }
 
-function WorkspaceRow({
-  workspace,
-  isActive,
-}: {
-  workspace: WorkspaceWithRole
-  isActive: boolean
-}) {
+function WorkspaceRow({ workspace, isActive }: { workspace: WorkspaceWithRole; isActive: boolean }) {
   return (
     <Link
       href={`/workspace/${workspace.id}`}
       className={`flex items-center gap-2 px-2 py-1.5 rounded-md text-sm transition-colors ${
-        isActive
-          ? 'bg-[#1c2333] text-white'
-          : 'text-gray-400 hover:text-gray-200 hover:bg-[#1c2333]'
+        isActive ? 'bg-slate-700/50 text-white' : 'text-slate-400 hover:text-white hover:bg-slate-700/40'
       }`}
     >
       {workspace.type === 'personal' ? (
-        <HomeIcon className="h-3.5 w-3.5 flex-shrink-0 text-indigo-400" />
+        <HomeIcon className="h-3.5 w-3.5 flex-shrink-0 text-orange-400" />
       ) : (
-        <BookIcon className="h-3.5 w-3.5 flex-shrink-0 text-amber-400" />
+        <BookIcon className="h-3.5 w-3.5 flex-shrink-0 text-orange-400" />
       )}
       <span className="truncate flex-1">{workspace.name}</span>
       {workspace.role === 'dm' && (
-        <span className="text-[10px] font-semibold text-amber-400 uppercase tracking-wide">
-          DM
-        </span>
+        <span className="text-[10px] font-semibold text-orange-400 uppercase tracking-wide">DM</span>
       )}
     </Link>
   )
