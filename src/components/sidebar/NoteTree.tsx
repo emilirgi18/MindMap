@@ -487,6 +487,7 @@ export default function NoteTree({ notes, folders, workspaceId, currentRole }: P
               <FolderPlusIcon />
             </button>
           )}
+
           <button
             onClick={(e) => { e.stopPropagation(); handleNewNote() }}
             disabled={isPending}
@@ -584,6 +585,7 @@ function PlusIcon() {
     </svg>
   )
 }
+
 
 function XSmallIcon() {
   return (

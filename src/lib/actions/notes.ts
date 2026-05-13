@@ -5,7 +5,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 
-export async function createNote(workspaceId: string, folderId?: string) {
+export async function createNote(workspaceId: string, folderId?: string, dmOnly = false) {
   const supabase = createClient()
   const {
     data: { user },
@@ -20,6 +20,7 @@ export async function createNote(workspaceId: string, folderId?: string) {
       title: 'Untitled',
       body: '',
       folder_id: folderId ?? null,
+      dm_only: dmOnly,
     })
     .select('id')
     .single()
@@ -28,6 +29,39 @@ export async function createNote(workspaceId: string, folderId?: string) {
 
   revalidatePath(`/workspace/${workspaceId}`, 'layout')
   redirect(`/workspace/${workspaceId}/note/${note.id}`)
+}
+
+export async function setNoteDmOnly(
+  noteId: string,
+  workspaceId: string,
+  dmOnly: boolean,
+): Promise<{ error?: string }> {
+  try {
+    const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { error: 'Not authenticated' }
+
+    const { data: member } = await supabase
+      .from('workspace_members')
+      .select('role')
+      .eq('workspace_id', workspaceId)
+      .eq('user_id', user.id)
+      .single()
+    if (!member || !['owner', 'dm'].includes(member.role)) {
+      return { error: 'Only the DM can change this' }
+    }
+
+    const { error } = await supabase
+      .from('notes')
+      .update({ dm_only: dmOnly })
+      .eq('id', noteId)
+    if (error) return { error: error.message }
+
+    revalidatePath(`/workspace/${workspaceId}`, 'layout')
+    return {}
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Failed' }
+  }
 }
 
 export async function deleteNote(noteId: string, workspaceId: string): Promise<{ error?: string }> {

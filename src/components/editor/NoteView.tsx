@@ -17,6 +17,9 @@ import Toolbar from './Toolbar'
 import PresenceBar from './PresenceBar'
 import NoteLinksPanel from './NoteLinksPanel'
 import TagsPanel from './TagsPanel'
+import BoardPanel from './BoardPanel'
+import { setNoteDmOnly } from '@/lib/actions/notes'
+import type { KanbanColumnItem } from '@/lib/types'
 
 interface NoteData {
   id: string
@@ -25,6 +28,8 @@ interface NoteData {
   yjs_state: string | null
   workspace_id: string
   dm_only: boolean
+  kanban_column_id?: string | null
+  timeline_position?: number | null
 }
 
 interface UserProfile {
@@ -37,6 +42,7 @@ interface Props {
   note: NoteData
   role: string
   profile: UserProfile
+  kanbanColumns?: KanbanColumnItem[]
 }
 
 type SaveStatus = 'saved' | 'saving' | 'unsaved'
@@ -91,7 +97,7 @@ function getOrCreateCollab(
 // Component
 // ---------------------------------------------------------------------------
 
-export default function NoteView({ note, role, profile }: Props) {
+export default function NoteView({ note, role, profile, kanbanColumns = [] }: Props) {
   const router = useRouter()
   const supabase = createClient()
 
@@ -99,8 +105,17 @@ export default function NoteView({ note, role, profile }: Props) {
   const { ydoc, provider } = getOrCreateCollab(note, profile)
 
   const [title, setTitle] = useState(note.title)
+  const [dmOnly, setDmOnly] = useState(note.dm_only)
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('saved')
   const [imageError, setImageError] = useState<string | null>(null)
+
+  const canToggleDm = role === 'owner' || role === 'dm'
+
+  async function handleDmToggle() {
+    const next = !dmOnly
+    setDmOnly(next)
+    await setNoteDmOnly(note.id, note.workspace_id, next)
+  }
 
   const titleTimer = useRef<ReturnType<typeof setTimeout>>()
   const snapTimer = useRef<ReturnType<typeof setTimeout>>()
@@ -286,11 +301,27 @@ export default function NoteView({ note, role, profile }: Props) {
             className="flex-1 min-w-0 bg-transparent text-3xl font-bold text-white placeholder-gray-700 focus:outline-none disabled:cursor-default"
           />
           <div className="flex items-center gap-3 pt-2.5 flex-shrink-0">
-            {note.dm_only && (
-              <span className="flex items-center gap-1 text-xs text-amber-400 font-medium">
-                <LockIcon className="h-3 w-3" />
-                DM only
-              </span>
+            {(canToggleDm || dmOnly) && (
+              <div className="flex items-center gap-1.5" title={canToggleDm ? (dmOnly ? 'DM only — click to make visible to all' : 'Click to make DM-only') : 'DM only'}>
+                <LockIcon className={`h-3 w-3 flex-shrink-0 ${dmOnly ? 'text-amber-400' : 'text-gray-600'}`} />
+                <span className={`text-xs ${dmOnly ? 'text-amber-400' : 'text-gray-600'}`}>DM only</span>
+                {canToggleDm && (
+                  <button
+                    role="switch"
+                    aria-checked={dmOnly}
+                    onClick={handleDmToggle}
+                    className={`relative inline-flex h-4 w-7 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-150 focus:outline-none ${
+                      dmOnly ? 'bg-amber-500' : 'bg-[#2a3347]'
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-3 w-3 rounded-full bg-white shadow transition-transform duration-150 ${
+                        dmOnly ? 'translate-x-3' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
+                )}
+              </div>
             )}
             <PresenceBar provider={provider} />
             <span
@@ -338,11 +369,18 @@ export default function NoteView({ note, role, profile }: Props) {
               canEdit={canEdit}
             />
           </div>
-          <div className="w-56 flex-shrink-0">
+          <div className="w-56 flex-shrink-0 flex flex-col gap-6">
             <TagsPanel
               noteId={note.id}
               workspaceId={note.workspace_id}
               canEdit={canEdit}
+            />
+            <BoardPanel
+              noteId={note.id}
+              workspaceId={note.workspace_id}
+              kanbanColumns={kanbanColumns}
+              initialKanbanColumnId={note.kanban_column_id ?? null}
+              initialOnTimeline={note.timeline_position != null}
             />
           </div>
         </div>

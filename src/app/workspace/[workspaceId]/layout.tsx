@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import Sidebar from '@/components/sidebar/Sidebar'
-import type { WorkspaceWithRole, NoteListItem, FolderItem, UserProfile } from '@/lib/types'
+import type { WorkspaceWithRole, NoteListItem, FolderItem, UserProfile, KanbanColumnItem } from '@/lib/types'
 
 export default async function WorkspaceLayout({
   children,
@@ -18,8 +18,8 @@ export default async function WorkspaceLayout({
   } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  // Parallel fetch: workspaces+roles, notes (stable columns), folder assignments, folders table, profile
-  const [membershipsRes, notesRes, noteFolderRes, foldersRes, profileRes] = await Promise.all([
+  // Parallel fetch: workspaces+roles, notes (stable columns), folder assignments, folders table, profile, kanban columns
+  const [membershipsRes, notesRes, noteFolderRes, foldersRes, profileRes, kanbanColumnsRes] = await Promise.all([
     supabase
       .from('workspace_members')
       .select('role, workspaces(id, name, type, owner_id)')
@@ -31,7 +31,7 @@ export default async function WorkspaceLayout({
       .eq('workspace_id', workspaceId)
       .order('updated_at', { ascending: false })
       .limit(200),
-    // folder_id column — only exists after migration; errors are silently ignored below
+    // folder_id — only exists after folders migration; errors silently ignored below
     supabase
       .from('notes')
       .select('id, folder_id')
@@ -43,6 +43,11 @@ export default async function WorkspaceLayout({
       .eq('workspace_id', workspaceId)
       .order('created_at', { ascending: true }),
     supabase.from('profiles').select('id, full_name, email').eq('id', user.id).single(),
+    supabase
+      .from('kanban_columns')
+      .select('id, name, position, color')
+      .eq('workspace_id', workspaceId)
+      .order('position', { ascending: true }),
   ])
 
   // Fetch tags for all notes in this workspace (used for tag-based search)
@@ -89,9 +94,13 @@ export default async function WorkspaceLayout({
   const notes: NoteListItem[] = (notesRes.data ?? []).map((n) => ({
     ...(n as NoteListItem),
     folder_id: folderMap.get(n.id) ?? null,
+    kanban_column_id: null,
+    kanban_position: null,
+    timeline_position: null,
     tags: tagsMap.get(n.id) ?? [],
   }))
   const folders: FolderItem[] = (foldersRes.data ?? []) as FolderItem[]
+  const kanbanColumns: KanbanColumnItem[] = (kanbanColumnsRes.data ?? []) as KanbanColumnItem[]
 
   const profile: UserProfile = profileRes.data ?? {
     id: user.id,
@@ -107,6 +116,7 @@ export default async function WorkspaceLayout({
         workspaces={workspaces}
         notes={notes}
         folders={folders}
+        kanbanColumns={kanbanColumns}
         currentWorkspaceId={workspaceId}
         currentRole={current.role}
         profile={profile}

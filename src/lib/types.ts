@@ -15,16 +15,27 @@ export interface WorkspaceWithRole {
 export interface NoteListItem {
   id: string
   title: string
+  body?: string
   dm_only: boolean
   folder_id: string | null
   updated_at: string
   tags: string[]
+  kanban_column_id: string | null
+  kanban_position: number | null
+  timeline_position: number | null
 }
 
 export interface FolderItem {
   id: string
   name: string
   parent_id: string | null
+}
+
+export interface KanbanColumnItem {
+  id: string
+  name: string
+  position: number
+  color: string | null
 }
 
 export interface UserProfile {

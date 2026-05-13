@@ -104,6 +104,32 @@ export type Database = {
           created_at?: string
         }
       }
+      kanban_columns: {
+        Row: {
+          id: string
+          workspace_id: string
+          name: string
+          position: number
+          color: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          workspace_id: string
+          name: string
+          position?: number
+          color?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          workspace_id?: string
+          name?: string
+          position?: number
+          color?: string | null
+          created_at?: string
+        }
+      }
       notes: {
         Row: {
           id: string
@@ -114,6 +140,9 @@ export type Database = {
           dm_only: boolean
           yjs_state: string | null
           folder_id: string | null
+          kanban_column_id: string | null
+          kanban_position: number | null
+          timeline_position: number | null
           deleted_at: string | null
           created_at: string
           updated_at: string
@@ -127,6 +156,9 @@ export type Database = {
           dm_only?: boolean
           yjs_state?: string | null
           folder_id?: string | null
+          kanban_column_id?: string | null
+          kanban_position?: number | null
+          timeline_position?: number | null
           deleted_at?: string | null
           created_at?: string
           updated_at?: string
@@ -140,6 +172,9 @@ export type Database = {
           dm_only?: boolean
           yjs_state?: string | null
           folder_id?: string | null
+          kanban_column_id?: string | null
+          kanban_position?: number | null
+          timeline_position?: number | null
           deleted_at?: string | null
           created_at?: string
           updated_at?: string
@@ -258,3 +293,4 @@ export type Invite = Tables<'invites'>
 
 export type WorkspaceRole = WorkspaceMember['role']
 export type WorkspaceType = Workspace['type']
+export type KanbanColumn = Tables<'kanban_columns'>

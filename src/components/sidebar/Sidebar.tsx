@@ -1,6 +1,31 @@
 'use client'
 
 import { useState } from 'react'
+
+function KanbanIcon() {
+  return (
+    <svg className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor" aria-hidden>
+      <rect x="2" y="3" width="4" height="14" rx="1" />
+      <rect x="8" y="3" width="4" height="9" rx="1" />
+      <rect x="14" y="3" width="4" height="11" rx="1" />
+    </svg>
+  )
+}
+
+function TimelineIcon() {
+  return (
+    <svg className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor" aria-hidden>
+      <circle cx="10" cy="4" r="1.5" />
+      <circle cx="10" cy="10" r="1.5" />
+      <circle cx="10" cy="16" r="1.5" />
+      <line x1="10" y1="5.5" x2="10" y2="8.5" stroke="currentColor" strokeWidth="1.5" />
+      <line x1="10" y1="11.5" x2="10" y2="14.5" stroke="currentColor" strokeWidth="1.5" />
+      <line x1="12" y1="4" x2="18" y2="4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      <line x1="12" y1="10" x2="16" y2="10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      <line x1="12" y1="16" x2="17" y2="16" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  )
+}
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import WorkspaceSwitcher from './WorkspaceSwitcher'
@@ -8,12 +33,13 @@ import NoteTree from './NoteTree'
 import NewWorkspaceModal from './NewWorkspaceModal'
 import { useAppStore } from '@/store'
 import { signOut } from '@/lib/actions/auth'
-import type { WorkspaceWithRole, NoteListItem, FolderItem, UserProfile } from '@/lib/types'
+import type { WorkspaceWithRole, NoteListItem, FolderItem, UserProfile, KanbanColumnItem } from '@/lib/types'
 
 interface Props {
   workspaces: WorkspaceWithRole[]
   notes: NoteListItem[]
   folders: FolderItem[]
+  kanbanColumns: KanbanColumnItem[]
   currentWorkspaceId: string
   currentRole: WorkspaceWithRole['role']
   profile: UserProfile
@@ -24,6 +50,7 @@ export default function Sidebar({
   workspaces,
   notes,
   folders,
+  kanbanColumns,
   currentWorkspaceId,
   currentRole,
   profile,
@@ -36,8 +63,14 @@ export default function Sidebar({
   const isCampaign = currentWorkspace?.type === 'campaign'
   const graphHref = `/workspace/${currentWorkspaceId}/graph`
   const membersHref = `/workspace/${currentWorkspaceId}/members`
+  const kanbanHref = `/workspace/${currentWorkspaceId}/kanban`
+  const timelineHref = `/workspace/${currentWorkspaceId}/timeline`
   const isGraph = pathname === graphHref
   const isMembers = pathname === membersHref
+  const isKanban = pathname === kanbanHref
+  const isTimeline = pathname === timelineHref
+
+  void kanbanColumns // available for future badge counts
 
   if (!sidebarOpen) {
     return (
@@ -105,6 +138,28 @@ export default function Sidebar({
               Members
             </Link>
           )}
+          <Link
+            href={kanbanHref}
+            className={`flex items-center gap-2 px-2 py-1.5 rounded-md text-xs font-medium transition-colors ${
+              isKanban
+                ? 'bg-indigo-600/20 text-indigo-400'
+                : 'text-gray-500 hover:text-gray-300 hover:bg-[#1c2333]'
+            }`}
+          >
+            <KanbanIcon />
+            Kanban
+          </Link>
+          <Link
+            href={timelineHref}
+            className={`flex items-center gap-2 px-2 py-1.5 rounded-md text-xs font-medium transition-colors ${
+              isTimeline
+                ? 'bg-indigo-600/20 text-indigo-400'
+                : 'text-gray-500 hover:text-gray-300 hover:bg-[#1c2333]'
+            }`}
+          >
+            <TimelineIcon />
+            Timeline
+          </Link>
         </div>
 
         {/* Note list — scrollable */}
