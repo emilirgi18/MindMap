@@ -1,5 +1,10 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  experimental: {
+    // Always re-fetch dynamic pages on navigation so changes made in one
+    // view (note editor) immediately show up in another (kanban, timeline, graph).
+    staleTimes: { dynamic: 0 },
+  },
   images: {
     remotePatterns: [
       {

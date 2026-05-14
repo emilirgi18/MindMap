@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import dynamic from 'next/dynamic'
+import { createClient } from '@/lib/supabase/client'
+import { getRecentUpdate, subscribeBoardUpdates } from '@/lib/boardSync'
 
 const ForceGraph3D = dynamic(() => import('react-force-graph-3d'), {
   ssr: false,
@@ -38,8 +40,8 @@ export interface FolderLegendItem {
 }
 
 interface Props {
-  nodes: GraphNode[]
-  links: GraphLink[]
+  initialNodes: GraphNode[]
+  initialLinks: GraphLink[]
   workspaceId: string
   folderColors: Record<string, string>
   folderLegend: FolderLegendItem[]
@@ -51,11 +53,44 @@ interface Props {
 // -----------------------------------------------------------------------
 
 export default function GraphView({
-  nodes, links, workspaceId, folderColors, folderLegend, hasUnfolderedNotes,
+  initialNodes, initialLinks, workspaceId, folderColors, folderLegend, hasUnfolderedNotes,
 }: Props) {
   const router = useRouter()
   const containerRef = useRef<HTMLDivElement>(null)
+  const channelRef = useRef<import('@supabase/supabase-js').RealtimeChannel | null>(null)
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 })
+  const [nodes, setNodes] = useState<GraphNode[]>(initialNodes)
+  const [links, setLinks] = useState<GraphLink[]>(initialLinks)
+
+  const fetchGraph = useCallback(async () => {
+    const supabase = createClient()
+    const [{ data: notesData }, { data: linksData }] = await Promise.all([
+      supabase
+        .from('notes')
+        .select('id, title, dm_only, folder_id')
+        .eq('workspace_id', workspaceId)
+        .is('deleted_at', null),
+      supabase.from('note_links').select('source_id, target_id'),
+    ])
+    if (!notesData) return
+    const noteIdSet = new Set(notesData.map((n) => n.id))
+    const linkRows = (linksData ?? []).filter(
+      (l) => noteIdSet.has(l.source_id) && noteIdSet.has(l.target_id),
+    )
+    const connectionCount = new Map<string, number>()
+    for (const l of linkRows) {
+      connectionCount.set(l.source_id, (connectionCount.get(l.source_id) ?? 0) + 1)
+      connectionCount.set(l.target_id, (connectionCount.get(l.target_id) ?? 0) + 1)
+    }
+    setNodes(notesData.map((n) => ({
+      id: n.id,
+      name: n.title || 'Untitled',
+      dmOnly: n.dm_only,
+      folderId: n.folder_id ?? null,
+      val: Math.max(1, connectionCount.get(n.id) ?? 1),
+    })))
+    setLinks(linkRows.map((l) => ({ source: l.source_id, target: l.target_id })))
+  }, [workspaceId])
 
   useEffect(() => {
     function update() {
@@ -69,6 +104,105 @@ export default function GraphView({
     window.addEventListener('resize', update)
     return () => window.removeEventListener('resize', update)
   }, [])
+
+  useEffect(() => {
+    fetchGraph()
+    const recentUpdate = getRecentUpdate(workspaceId)
+    const timer = setTimeout(fetchGraph, recentUpdate ? 500 : 2000)
+    const unsub = subscribeBoardUpdates(workspaceId, fetchGraph)
+    return () => { clearTimeout(timer); unsub() }
+  }, [workspaceId, fetchGraph])
+
+  useEffect(() => {
+    const supabase = createClient()
+
+    const channel = supabase
+      .channel(`workspace-sync-${workspaceId}`, {
+        config: { broadcast: { self: false } },
+      })
+      .on('broadcast', { event: 'refresh' }, () => {
+        console.log('[Graph Realtime] broadcast refresh received')
+        fetchGraph()
+      })
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'notes', filter: `workspace_id=eq.${workspaceId}` },
+        (payload) => {
+          const { eventType } = payload
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const row = (payload.new ?? {}) as any
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const oldRow = (payload.old ?? {}) as any
+
+          const removeNode = (id: string) => {
+            setNodes((prev) => prev.filter((n) => n.id !== id))
+            setLinks((prev) => prev.filter((l) => {
+              const src = typeof l.source === 'object' ? (l.source as GraphNode).id : l.source
+              const tgt = typeof l.target === 'object' ? (l.target as GraphNode).id : l.target
+              return src !== id && tgt !== id
+            }))
+          }
+
+          if (eventType === 'DELETE') { removeNode(oldRow.id); return }
+          if (row.deleted_at) { removeNode(row.id); return }
+
+          setNodes((prev) => {
+            const exists = prev.some((n) => n.id === row.id)
+            if (exists) {
+              return prev.map((n) => n.id === row.id
+                ? { ...n, name: row.title || 'Untitled', dmOnly: row.dm_only, folderId: row.folder_id ?? null }
+                : n)
+            }
+            return [...prev, { id: row.id, name: row.title || 'Untitled', dmOnly: row.dm_only, folderId: row.folder_id ?? null, val: 1 }]
+          })
+        },
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'note_links' },
+        (payload) => {
+          const { eventType } = payload
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const row = (payload.new ?? {}) as any
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const oldRow = (payload.old ?? {}) as any
+
+          if (eventType === 'INSERT') {
+            setNodes((prev) => prev.map((n) =>
+              n.id === row.source_id || n.id === row.target_id ? { ...n, val: n.val + 1 } : n,
+            ))
+            setLinks((prev) => {
+              const dup = prev.some((l) => {
+                const src = typeof l.source === 'object' ? (l.source as GraphNode).id : l.source
+                const tgt = typeof l.target === 'object' ? (l.target as GraphNode).id : l.target
+                return src === row.source_id && tgt === row.target_id
+              })
+              return dup ? prev : [...prev, { source: row.source_id, target: row.target_id }]
+            })
+          } else if (eventType === 'DELETE') {
+            setNodes((prev) => prev.map((n) =>
+              n.id === oldRow.source_id || n.id === oldRow.target_id
+                ? { ...n, val: Math.max(1, n.val - 1) }
+                : n,
+            ))
+            setLinks((prev) => prev.filter((l) => {
+              const src = typeof l.source === 'object' ? (l.source as GraphNode).id : l.source
+              const tgt = typeof l.target === 'object' ? (l.target as GraphNode).id : l.target
+              return !(src === oldRow.source_id && tgt === oldRow.target_id)
+            }))
+          }
+        },
+      )
+      .subscribe((status, err) => {
+        if (err) console.error('[Graph Realtime] error:', err)
+        else if (status === 'SUBSCRIBED') console.log('[Graph Realtime] subscribed ✓')
+        else if (status === 'CHANNEL_ERROR') console.error('[Graph Realtime] channel error')
+        else if (status === 'TIMED_OUT') console.warn('[Graph Realtime] timed out')
+      })
+
+    channelRef.current = channel
+    return () => { supabase.removeChannel(channel); channelRef.current = null }
+  }, [workspaceId, fetchGraph])
 
   const handleNodeClick = useCallback(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

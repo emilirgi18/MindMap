@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import Sidebar from '@/components/sidebar/Sidebar'
+import { RouterProgress } from '@/components/RouterProgress'
 import type { WorkspaceWithRole, NoteListItem, FolderItem, UserProfile, KanbanColumnItem } from '@/lib/types'
 
 export default async function WorkspaceLayout({
@@ -112,6 +113,7 @@ export default async function WorkspaceLayout({
 
   return (
     <div className="h-screen flex overflow-hidden bg-[#0f1117]">
+      <RouterProgress />
       <Sidebar
         workspaces={workspaces}
         notes={notes}

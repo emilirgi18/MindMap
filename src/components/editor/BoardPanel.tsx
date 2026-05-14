@@ -1,7 +1,8 @@
 'use client'
 
-import { useState, useTransition } from 'react'
-import { addNoteToTimeline, removeNoteFromTimeline, moveNoteToColumn } from '@/lib/actions/kanban'
+import { useState, useRef, useEffect } from 'react'
+import { createClient } from '@/lib/supabase/client'
+import { notifyBoardUpdate, broadcastRefresh } from '@/lib/boardSync'
 import type { KanbanColumnItem } from '@/lib/types'
 
 interface Props {
@@ -16,24 +17,110 @@ export default function BoardPanel({ noteId, workspaceId, kanbanColumns, initial
   const [kanbanColumnId, setKanbanColumnId] = useState(initialKanbanColumnId)
   const [onTimeline, setOnTimeline] = useState(initialOnTimeline)
   const [showColumnPicker, setShowColumnPicker] = useState(false)
-  const [pending, startTransition] = useTransition()
+  const [pending, setPending] = useState(false)
+  const mounted = useRef(true)
+  useEffect(() => () => { mounted.current = false }, [])
 
   const currentColumn = kanbanColumns.find((c) => c.id === kanbanColumnId)
 
-  function handleTimelineToggle() {
-    if (onTimeline) {
-      setOnTimeline(false)
-      startTransition(async () => { await removeNoteFromTimeline(noteId, workspaceId) })
+  async function handleTimelineToggle() {
+    if (pending) return
+    const removing = onTimeline
+    setOnTimeline(!removing)
+    setPending(true)
+
+    const supabase = createClient()
+    let error: string | null = null
+
+    if (removing) {
+      const { error: err } = await supabase
+        .from('notes')
+        .update({ timeline_position: null })
+        .eq('id', noteId)
+        .eq('workspace_id', workspaceId)
+      error = err?.message ?? null
     } else {
-      setOnTimeline(true)
-      startTransition(async () => { await addNoteToTimeline(noteId, workspaceId) })
+      // Place at the end of the timeline
+      const { data: existing } = await supabase
+        .from('notes')
+        .select('timeline_position')
+        .eq('workspace_id', workspaceId)
+        .not('timeline_position', 'is', null)
+        .order('timeline_position', { ascending: false })
+        .limit(1)
+      const position = existing?.[0]?.timeline_position != null
+        ? existing[0].timeline_position + 1000
+        : 0
+      const { error: err } = await supabase
+        .from('notes')
+        .update({ timeline_position: position })
+        .eq('id', noteId)
+        .eq('workspace_id', workspaceId)
+      error = err?.message ?? null
+    }
+
+    if (!mounted.current) {
+      if (!error) { notifyBoardUpdate(workspaceId, noteId); broadcastRefresh(workspaceId) }
+      return
+    }
+    setPending(false)
+    if (error) {
+      console.error('[BoardPanel] timeline update error:', error)
+      setOnTimeline(removing) // revert
+    } else {
+      notifyBoardUpdate(workspaceId, noteId)
+      broadcastRefresh(workspaceId)
     }
   }
 
-  function handleColumnSelect(colId: string | null) {
+  async function handleColumnSelect(colId: string | null) {
+    if (pending) return
     setShowColumnPicker(false)
     setKanbanColumnId(colId)
-    startTransition(async () => { await moveNoteToColumn(noteId, workspaceId, colId) })
+    setPending(true)
+
+    const supabase = createClient()
+    let error: string | null = null
+
+    if (colId === null) {
+      const { error: err } = await supabase
+        .from('notes')
+        .update({ kanban_column_id: null, kanban_position: null })
+        .eq('id', noteId)
+        .eq('workspace_id', workspaceId)
+      error = err?.message ?? null
+    } else {
+      // Place at the end of the target column
+      const { data: existing } = await supabase
+        .from('notes')
+        .select('kanban_position')
+        .eq('kanban_column_id', colId)
+        .order('kanban_position', { ascending: false })
+        .limit(1)
+      const position = existing?.[0]?.kanban_position != null
+        ? existing[0].kanban_position + 1000
+        : 0
+      const { error: err } = await supabase
+        .from('notes')
+        .update({ kanban_column_id: colId, kanban_position: position })
+        .eq('id', noteId)
+        .eq('workspace_id', workspaceId)
+      error = err?.message ?? null
+    }
+
+    if (!mounted.current) {
+      if (!error) { notifyBoardUpdate(workspaceId, noteId); broadcastRefresh(workspaceId) }
+      return
+    }
+    setPending(false)
+    if (error) {
+      console.error('[BoardPanel] column update error:', error)
+      setKanbanColumnId(initialKanbanColumnId) // revert
+    } else {
+      console.log('[BoardPanel] column update OK → col =', colId)
+      notifyBoardUpdate(workspaceId, noteId)
+      broadcastRefresh(workspaceId)
+    }
   }
 
   return (

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { broadcastRefresh } from '@/lib/boardSync'
 
 interface LinkedNote { id: string; title: string }
 interface Props { noteId: string; workspaceId: string; canEdit: boolean }
@@ -77,11 +78,13 @@ export default function NoteLinksPanel({ noteId, workspaceId, canEdit }: Props) 
     await supabase.from('note_links').upsert({ source_id: noteId, target_id: target.id }, { onConflict: 'source_id,target_id', ignoreDuplicates: true })
     setLinks((prev) => [...prev, target])
     setQuery(''); setResults([]); setOpen(false)
+    broadcastRefresh(workspaceId)
   }
 
   async function removeLink(targetId: string) {
     await supabase.from('note_links').delete().eq('source_id', noteId).eq('target_id', targetId)
     setLinks((prev) => prev.filter((l) => l.id !== targetId))
+    broadcastRefresh(workspaceId)
   }
 
   return (

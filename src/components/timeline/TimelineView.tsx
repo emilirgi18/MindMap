@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   DndContext,
   DragOverlay,
@@ -21,6 +21,8 @@ import { CSS } from '@dnd-kit/utilities'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { reorderTimeline } from '@/lib/actions/kanban'
+import { createClient } from '@/lib/supabase/client'
+import { getRecentUpdate, subscribeBoardUpdates } from '@/lib/boardSync'
 import type { NoteListItem } from '@/lib/types'
 
 interface Props {
@@ -52,8 +54,120 @@ export default function TimelineView({ initialNotes, workspaceId }: Props) {
       .sort((a, b) => (a.timeline_position ?? 0) - (b.timeline_position ?? 0)),
   )
   const [activeNote, setActiveNote] = useState<NoteListItem | null>(null)
-  const [, startTransition] = useTransition()
+  const channelRef = useRef<import('@supabase/supabase-js').RealtimeChannel | null>(null)
   const router = useRouter()
+
+  const fetchNotes = useCallback(async () => {
+    const supabase = createClient()
+    const { data } = await supabase
+      .from('notes')
+      .select('id, title, body, dm_only, updated_at, kanban_column_id, kanban_position, timeline_position, folder_id')
+      .eq('workspace_id', workspaceId)
+      .is('deleted_at', null)
+      .not('timeline_position', 'is', null)
+      .order('timeline_position', { ascending: true })
+    if (!data) return
+    if (data.length === 0) { setNotes([]); return }
+    const noteIds = data.map((n) => n.id)
+    const { data: tagData } = await supabase.from('tags').select('note_id, name').in('note_id', noteIds)
+    const tagsMap = new Map<string, string[]>()
+    for (const t of tagData ?? []) {
+      const arr = tagsMap.get(t.note_id) ?? []
+      arr.push(t.name)
+      tagsMap.set(t.note_id, arr)
+    }
+    setNotes(data.map((n) => ({ ...n, tags: tagsMap.get(n.id) ?? [] }) as NoteListItem))
+  }, [workspaceId])
+
+  // Mount: immediate fetch + delayed fallback + same-tab event bus
+  useEffect(() => {
+    fetchNotes()
+    const recentUpdate = getRecentUpdate(workspaceId)
+    const timer = setTimeout(fetchNotes, recentUpdate ? 500 : 2000)
+    const unsub = subscribeBoardUpdates(workspaceId, fetchNotes)
+    return () => { clearTimeout(timer); unsub() }
+  }, [workspaceId, fetchNotes])
+
+  useEffect(() => {
+    const supabase = createClient()
+
+    const channel = supabase
+      .channel(`workspace-sync-${workspaceId}`, {
+        config: { broadcast: { self: false } },
+      })
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'notes', filter: `workspace_id=eq.${workspaceId}` },
+        (payload) => {
+          const { eventType } = payload
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const row = (payload.new ?? {}) as any
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const oldRow = (payload.old ?? {}) as any
+
+          if (eventType === 'DELETE') {
+            setNotes((prev) => prev.filter((n) => n.id !== oldRow.id))
+            return
+          }
+
+          if (row.deleted_at || row.timeline_position === null) {
+            setNotes((prev) => prev.filter((n) => n.id !== row.id))
+            return
+          }
+
+          setNotes((prev) => {
+            const exists = prev.some((n) => n.id === row.id)
+            const patched: NoteListItem = exists
+              ? { ...prev.find((n) => n.id === row.id)!, title: row.title, body: row.body, dm_only: row.dm_only, updated_at: row.updated_at, timeline_position: row.timeline_position }
+              : { id: row.id, title: row.title, body: row.body, dm_only: row.dm_only, updated_at: row.updated_at, timeline_position: row.timeline_position, kanban_column_id: row.kanban_column_id, kanban_position: row.kanban_position, folder_id: null, tags: [] }
+            const next = exists ? prev.map((n) => n.id === row.id ? patched : n) : [...prev, patched]
+            return next.sort((a, b) => (a.timeline_position ?? 0) - (b.timeline_position ?? 0))
+          })
+
+          // Re-fetch tags for this note
+          supabase.from('tags').select('name').eq('note_id', row.id).then(({ data }) => {
+            if (!data) return
+            const tagNames = data.map((t) => t.name).sort()
+            setNotes((prev) => prev.map((n) => n.id === row.id ? { ...n, tags: tagNames } : n))
+          })
+        },
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'tags' },
+        (payload) => {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const row = ((payload.new && (payload.new as any).note_id) ? payload.new : payload.old) as any
+          const noteId: string | undefined = row?.note_id
+          if (!noteId) return
+          supabase.from('tags').select('name').eq('note_id', noteId).then(({ data }) => {
+            if (!data) return
+            const tagNames = data.map((t) => t.name).sort()
+            setNotes((prev) => {
+              if (!prev.some((n) => n.id === noteId)) return prev
+              return prev.map((n) => n.id === noteId ? { ...n, tags: tagNames } : n)
+            })
+          })
+        },
+      )
+      .on('broadcast', { event: 'refresh' }, () => {
+        console.log('[Timeline Realtime] broadcast refresh received')
+        fetchNotes()
+      })
+      .subscribe((status, err) => {
+        if (err) console.error('[Timeline Realtime] error:', err)
+        else if (status === 'SUBSCRIBED') console.log('[Timeline Realtime] subscribed ✓')
+        else if (status === 'CHANNEL_ERROR') console.error('[Timeline Realtime] channel error')
+        else if (status === 'TIMED_OUT') console.warn('[Timeline Realtime] timed out')
+      })
+
+    channelRef.current = channel
+    return () => { supabase.removeChannel(channel); channelRef.current = null }
+  }, [workspaceId, fetchNotes])
+
+  function broadcast() {
+    channelRef.current?.send({ type: 'broadcast', event: 'refresh', payload: {} })
+  }
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -71,9 +185,7 @@ export default function TimelineView({ initialNotes, workspaceId }: Props) {
       const oldIdx = prev.findIndex((n) => n.id === active.id)
       const newIdx = prev.findIndex((n) => n.id === over.id)
       const reordered = arrayMove(prev, oldIdx, newIdx)
-      startTransition(() => {
-        reorderTimeline(workspaceId, reordered.map((n) => n.id))
-      })
+      reorderTimeline(workspaceId, reordered.map((n) => n.id)).then(broadcast)
       return reordered
     })
   }

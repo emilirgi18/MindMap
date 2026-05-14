@@ -1,10 +1,11 @@
 'use client'
 
-import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useTransition, useState, useRef, useEffect } from 'react'
 import { createNote, deleteNote, setNoteFolder } from '@/lib/actions/notes'
 import { createFolder, createSubfolder, deleteFolder, renameFolder, setFolderParent } from '@/lib/actions/folders'
+import { createClient } from '@/lib/supabase/client'
+import { subscribeBoardUpdates, broadcastRefresh } from '@/lib/boardSync'
 import type { NoteListItem, FolderItem, WorkspaceRole } from '@/lib/types'
 
 export type { NoteListItem }
@@ -70,6 +71,8 @@ function NoteRow({
   movingNote, confirming, matchedTags, dragItem, onDragStart, onDragEnd,
   onSetMoving, onDeleteNote, onMoveNote, onConfirm,
 }: NoteRowProps) {
+  const router = useRouter()
+  const [navPending, startNavTransition] = useTransition()
   const href = `/workspace/${workspaceId}/note/${note.id}`
   const isActive = pathname === href || pathname.startsWith(href + '/')
   const isMoving = movingNote === note.id
@@ -84,17 +87,22 @@ function NoteRow({
       onDragEnd={onDragEnd}
     >
       <div className={`flex items-center rounded-md transition-colors ${isActive ? 'bg-orange-500/12' : 'hover:bg-slate-700/40'}`}>
-        <Link
-          href={href}
+        <button
+          onClick={() => startNavTransition(() => router.push(href))}
           draggable={false}
-          className={`flex-1 min-w-0 flex flex-col px-2 py-1.5 text-sm ${isActive ? 'text-orange-400' : 'text-slate-500 group-hover/note:text-slate-200'}`}
+          className={`flex-1 min-w-0 flex flex-col px-2 py-1.5 text-sm text-left ${isActive ? 'text-orange-400' : 'text-slate-500 group-hover/note:text-slate-200'}`}
         >
           <span className="flex items-center gap-1.5">
-            {canSeeLock && note.dm_only && (
+            {navPending ? (
+              <svg className="h-3 w-3 flex-shrink-0 animate-spin text-orange-400" viewBox="0 0 24 24" fill="none">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+            ) : canSeeLock && note.dm_only ? (
               <svg className="h-3 w-3 flex-shrink-0 text-orange-400" viewBox="0 0 20 20" fill="currentColor">
                 <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
               </svg>
-            )}
+            ) : null}
             <span className="truncate">{note.title || 'Untitled'}</span>
           </span>
           {matchedTags && matchedTags.length > 0 && (
@@ -104,7 +112,7 @@ function NoteRow({
               ))}
             </span>
           )}
-        </Link>
+        </button>
 
         {isConfirming ? (
           <div className="flex items-center gap-1 pr-1 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
@@ -314,6 +322,20 @@ export default function NoteTree({ notes, folders, workspaceId, currentRole }: P
     if (editingFolder) editInputRef.current?.focus()
   }, [editingFolder])
 
+  useEffect(() => {
+    const supabase = createClient()
+    const channel = supabase
+      .channel(`workspace-sync-${workspaceId}`, {
+        config: { broadcast: { self: false } },
+      })
+      .on('broadcast', { event: 'refresh' }, () => {
+        router.refresh()
+      })
+      .subscribe()
+    const unsub = subscribeBoardUpdates(workspaceId, () => router.refresh())
+    return () => { supabase.removeChannel(channel); unsub() }
+  }, [workspaceId]) // eslint-disable-line react-hooks/exhaustive-deps
+
   const tree = buildTree(folders, notes)
   const rootNotes = notes.filter((n) => n.folder_id === null)
   const filteredNotes = query.trim()
@@ -327,7 +349,7 @@ export default function NoteTree({ notes, folders, workspaceId, currentRole }: P
   // ---- Standard actions ----
 
   function handleNewNote(folderId?: string) {
-    startTransition(async () => { await createNote(workspaceId, folderId) })
+    startTransition(async () => { await createNote(workspaceId, folderId); broadcastRefresh(workspaceId) })
   }
 
   function handleDeleteNote(noteId: string) {
@@ -340,15 +362,16 @@ export default function NoteTree({ notes, folders, workspaceId, currentRole }: P
       if (result?.error) { setDeleteError(result.error); return }
       router.refresh()
       if (isOnThisNote) router.push(`/workspace/${workspaceId}`)
+      broadcastRefresh(workspaceId)
     })
   }
 
   function handleNewFolder() {
-    startTransition(async () => { await createFolder(workspaceId); router.refresh() })
+    startTransition(async () => { await createFolder(workspaceId); router.refresh(); broadcastRefresh(workspaceId) })
   }
 
   function handleNewSubfolder(parentId: string) {
-    startTransition(async () => { await createSubfolder(parentId, workspaceId); router.refresh() })
+    startTransition(async () => { await createSubfolder(parentId, workspaceId); router.refresh(); broadcastRefresh(workspaceId) })
   }
 
   function handleDeleteFolder(folderId: string) {
@@ -358,6 +381,7 @@ export default function NoteTree({ notes, folders, workspaceId, currentRole }: P
       const result = await deleteFolder(folderId, workspaceId)
       if (result?.error) { setDeleteError(result.error); return }
       router.refresh()
+      broadcastRefresh(workspaceId)
     })
   }
 
@@ -370,12 +394,12 @@ export default function NoteTree({ notes, folders, workspaceId, currentRole }: P
     const name = folderName.trim()
     setEditingFolder(null)
     if (!name || !folderId) return
-    startTransition(async () => { await renameFolder(folderId, workspaceId, name); router.refresh() })
+    startTransition(async () => { await renameFolder(folderId, workspaceId, name); router.refresh(); broadcastRefresh(workspaceId) })
   }
 
   function handleMoveNote(noteId: string, folderId: string | null) {
     setMovingNote(null)
-    startTransition(async () => { await setNoteFolder(noteId, workspaceId, folderId); router.refresh() })
+    startTransition(async () => { await setNoteFolder(noteId, workspaceId, folderId); router.refresh(); broadcastRefresh(workspaceId) })
   }
 
   // ---- Drag-and-drop ----
@@ -405,9 +429,9 @@ export default function NoteTree({ notes, folders, workspaceId, currentRole }: P
     if (dragItem.type === 'folder') {
       if (dragItem.id === folderId) return
       if (isAncestorOf(folders, dragItem.id, folderId)) return
-      startTransition(async () => { await setFolderParent(dragItem.id, workspaceId, folderId); router.refresh() })
+      startTransition(async () => { await setFolderParent(dragItem.id, workspaceId, folderId); router.refresh(); broadcastRefresh(workspaceId) })
     } else {
-      startTransition(async () => { await setNoteFolder(dragItem.id, workspaceId, folderId); router.refresh() })
+      startTransition(async () => { await setNoteFolder(dragItem.id, workspaceId, folderId); router.refresh(); broadcastRefresh(workspaceId) })
     }
     handleDragEnd()
   }
@@ -415,9 +439,9 @@ export default function NoteTree({ notes, folders, workspaceId, currentRole }: P
   function handleDropOnRoot() {
     if (!dragItem) return
     if (dragItem.type === 'folder') {
-      startTransition(async () => { await setFolderParent(dragItem.id, workspaceId, null); router.refresh() })
+      startTransition(async () => { await setFolderParent(dragItem.id, workspaceId, null); router.refresh(); broadcastRefresh(workspaceId) })
     } else {
-      startTransition(async () => { await setNoteFolder(dragItem.id, workspaceId, null); router.refresh() })
+      startTransition(async () => { await setNoteFolder(dragItem.id, workspaceId, null); router.refresh(); broadcastRefresh(workspaceId) })
     }
     handleDragEnd()
   }

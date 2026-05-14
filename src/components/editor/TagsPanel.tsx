@@ -14,9 +14,13 @@ export default function TagsPanel({ noteId, workspaceId, canEdit }: Props) {
   const inputRef   = useRef<HTMLInputElement>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
+  async function fetchTags() {
+    const { data } = await supabase.from('tags').select('name').eq('note_id', noteId)
+    if (data) setTags(data.map((t) => t.name).sort())
+  }
+
   useEffect(() => {
-    supabase.from('tags').select('name').eq('note_id', noteId)
-      .then(({ data }) => setTags((data ?? []).map((t) => t.name).sort()))
+    fetchTags()
   }, [noteId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
@@ -46,15 +50,17 @@ export default function TagsPanel({ noteId, workspaceId, canEdit }: Props) {
   async function addTag(name: string) {
     const n = name.trim().toLowerCase()
     if (!n || tags.includes(n)) return
-    await supabase.from('tags').upsert({ note_id: noteId, name: n }, { onConflict: 'note_id,name', ignoreDuplicates: true })
     setTags((prev) => [...prev, n].sort())
-    if (!pool.includes(n)) setPool((prev) => [...prev, n].sort())
     setInput(''); setOpen(false)
+    await supabase.from('tags').upsert({ note_id: noteId, name: n }, { onConflict: 'note_id,name', ignoreDuplicates: true })
+    if (!pool.includes(n)) setPool((prev) => [...prev, n].sort())
+    fetchTags()
   }
 
   async function removeTag(name: string) {
-    await supabase.from('tags').delete().eq('note_id', noteId).eq('name', name)
     setTags((prev) => prev.filter((t) => t !== name))
+    await supabase.from('tags').delete().eq('note_id', noteId).eq('name', name)
+    fetchTags()
   }
 
   return (

@@ -44,7 +44,8 @@ function TimelineIcon() {
 }
 
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
+import { useTransition } from 'react'
 import WorkspaceSwitcher from './WorkspaceSwitcher'
 import NoteTree from './NoteTree'
 import NewWorkspaceModal from './NewWorkspaceModal'
@@ -70,6 +71,15 @@ export default function Sidebar({
   const [showNewWorkspace, setShowNewWorkspace] = useState(false)
   const { sidebarOpen, toggleSidebar } = useAppStore()
   const pathname = usePathname()
+  const router = useRouter()
+  const [navPending, startNavTransition] = useTransition()
+  const [pendingHref, setPendingHref] = useState<string | null>(null)
+
+  function navTo(href: string) {
+    setPendingHref(href)
+    startNavTransition(() => { router.push(href); setPendingHref(null) })
+  }
+
   const currentWorkspace = workspaces.find((w) => w.id === currentWorkspaceId)
   const isCampaign = currentWorkspace?.type === 'campaign'
   const graphHref    = `/workspace/${currentWorkspaceId}/graph`
@@ -83,12 +93,21 @@ export default function Sidebar({
 
   void kanbanColumns
 
-  const navItem = (active: boolean) =>
+  const navItem = (active: boolean, pending: boolean) =>
     `flex items-center gap-2.5 px-2.5 py-2 rounded-md text-sm font-medium transition-colors ${
-      active
+      active || pending
         ? 'bg-orange-500/15 text-orange-400'
         : 'text-slate-500 hover:text-slate-100 hover:bg-slate-700/40'
     }`
+
+  function NavSpinner() {
+    return (
+      <svg className="h-4 w-4 animate-spin ml-auto opacity-60" viewBox="0 0 24 24" fill="none">
+        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" />
+        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+      </svg>
+    )
+  }
 
   if (!sidebarOpen) {
     return (
@@ -133,12 +152,12 @@ export default function Sidebar({
 
         {/* Nav links */}
         <div className="px-2 pt-1.5 pb-1 flex-shrink-0 flex flex-col gap-0.5">
-          <Link href={graphHref}    className={navItem(isGraph)}>   <GraphIcon />   Graph view  </Link>
+          <button onClick={() => navTo(graphHref)}    className={navItem(isGraph,    pendingHref === graphHref    && navPending)}><GraphIcon />   Graph view  {pendingHref === graphHref    && navPending && <NavSpinner />}</button>
           {isCampaign && (
-            <Link href={membersHref} className={navItem(isMembers)}> <PeopleIcon />  Members     </Link>
+            <button onClick={() => navTo(membersHref)} className={navItem(isMembers, pendingHref === membersHref  && navPending)}><PeopleIcon />  Members     {pendingHref === membersHref  && navPending && <NavSpinner />}</button>
           )}
-          <Link href={kanbanHref}   className={navItem(isKanban)}>  <KanbanIcon />  Kanban      </Link>
-          <Link href={timelineHref} className={navItem(isTimeline)}> <TimelineIcon />Timeline    </Link>
+          <button onClick={() => navTo(kanbanHref)}   className={navItem(isKanban,   pendingHref === kanbanHref   && navPending)}><KanbanIcon />  Kanban      {pendingHref === kanbanHref   && navPending && <NavSpinner />}</button>
+          <button onClick={() => navTo(timelineHref)} className={navItem(isTimeline, pendingHref === timelineHref && navPending)}><TimelineIcon />Timeline    {pendingHref === timelineHref && navPending && <NavSpinner />}</button>
         </div>
 
         <div className="mx-3 border-t border-[#334155]/60" />

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import {
   DndContext,
   DragOverlay,
@@ -20,7 +20,10 @@ import {
 import KanbanColumn from './KanbanColumn'
 import { KanbanCardOverlay } from './KanbanCard'
 import { createKanbanColumn, reorderKanbanColumns, reorderKanbanNotes } from '@/lib/actions/kanban'
+import { createClient } from '@/lib/supabase/client'
+import { getRecentUpdate, subscribeBoardUpdates } from '@/lib/boardSync'
 import type { NoteListItem, KanbanColumnItem } from '@/lib/types'
+import type { RealtimeChannel } from '@supabase/supabase-js'
 
 interface Props {
   initialColumns: KanbanColumnItem[]
@@ -37,7 +40,122 @@ export default function KanbanView({ initialColumns, initialNotes, workspaceId }
   const [activeColumnId, setActiveColumnId] = useState<string | null>(null)
   const [newColName, setNewColName] = useState('')
   const [addingCol, setAddingCol] = useState(false)
-  const [, startTransition] = useTransition()
+  const channelRef = useRef<RealtimeChannel | null>(null)
+
+  // Fetch fresh notes directly from Supabase (bypasses all Next.js caches)
+  const fetchNotes = useCallback(async () => {
+    const supabase = createClient()
+    const { data } = await supabase
+      .from('notes')
+      .select('id, title, body, dm_only, updated_at, kanban_column_id, kanban_position, timeline_position, folder_id')
+      .eq('workspace_id', workspaceId)
+      .is('deleted_at', null)
+      .not('kanban_column_id', 'is', null)
+    if (!data) return
+    if (data.length === 0) { setNotes([]); return }
+    const noteIds = data.map((n) => n.id)
+    const { data: tagData } = await supabase.from('tags').select('note_id, name').in('note_id', noteIds)
+    const tagsMap = new Map<string, string[]>()
+    for (const t of tagData ?? []) {
+      const arr = tagsMap.get(t.note_id) ?? []
+      arr.push(t.name)
+      tagsMap.set(t.note_id, arr)
+    }
+    setNotes(data.map((n) => ({ ...n, tags: tagsMap.get(n.id) ?? [] }) as NoteListItem))
+  }, [workspaceId])
+
+  // Mount: immediate fetch + delayed fallback + same-tab event bus
+  useEffect(() => {
+    fetchNotes()
+    const recentUpdate = getRecentUpdate(workspaceId)
+    const timer = setTimeout(fetchNotes, recentUpdate ? 500 : 2000)
+    const unsub = subscribeBoardUpdates(workspaceId, fetchNotes)
+    return () => { clearTimeout(timer); unsub() }
+  }, [workspaceId, fetchNotes])
+
+  // Realtime: postgres_changes + broadcast (cross-tab)
+  useEffect(() => {
+    const supabase = createClient()
+
+    const channel = supabase
+      .channel(`workspace-sync-${workspaceId}`, {
+        config: { broadcast: { self: false } },
+      })
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'notes', filter: `workspace_id=eq.${workspaceId}` },
+        (payload) => {
+          const { eventType } = payload
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const row = (payload.new ?? {}) as any
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const oldRow = (payload.old ?? {}) as any
+
+          console.log('[Kanban Realtime] postgres_changes:', eventType, row.id)
+
+          if (eventType === 'DELETE') {
+            setNotes((prev) => prev.filter((n) => n.id !== oldRow.id))
+            return
+          }
+          if (row.deleted_at || !row.kanban_column_id) {
+            setNotes((prev) => prev.filter((n) => n.id !== row.id))
+            return
+          }
+
+          setNotes((prev) => {
+            const exists = prev.some((n) => n.id === row.id)
+            const patched: NoteListItem = exists
+              ? { ...prev.find((n) => n.id === row.id)!, title: row.title, body: row.body, dm_only: row.dm_only, updated_at: row.updated_at, kanban_column_id: row.kanban_column_id, kanban_position: row.kanban_position }
+              : { id: row.id, title: row.title, body: row.body, dm_only: row.dm_only, updated_at: row.updated_at, kanban_column_id: row.kanban_column_id, kanban_position: row.kanban_position, timeline_position: row.timeline_position, folder_id: null, tags: [] }
+            return exists ? prev.map((n) => n.id === row.id ? patched : n) : [...prev, patched]
+          })
+
+          supabase.from('tags').select('name').eq('note_id', row.id).then(({ data }) => {
+            if (!data) return
+            setNotes((prev) => prev.map((n) => n.id === row.id ? { ...n, tags: data.map((t) => t.name).sort() } : n))
+          })
+        },
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'tags' },
+        (payload) => {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const row = ((payload.new && (payload.new as any).note_id) ? payload.new : payload.old) as any
+          const noteId: string | undefined = row?.note_id
+          if (!noteId) return
+          supabase.from('tags').select('name').eq('note_id', noteId).then(({ data }) => {
+            if (!data) return
+            const tagNames = data.map((t) => t.name).sort()
+            setNotes((prev) => {
+              if (!prev.some((n) => n.id === noteId)) return prev
+              return prev.map((n) => n.id === noteId ? { ...n, tags: tagNames } : n)
+            })
+          })
+        },
+      )
+      // Broadcast: another tab sent a refresh signal — just re-fetch
+      .on('broadcast', { event: 'refresh' }, () => {
+        console.log('[Kanban Realtime] broadcast refresh received')
+        fetchNotes()
+      })
+      .subscribe((status, err) => {
+        if (err) console.error('[Kanban Realtime] error:', err)
+        else if (status === 'SUBSCRIBED') console.log('[Kanban Realtime] subscribed ✓')
+        else if (status === 'CHANNEL_ERROR') console.error('[Kanban Realtime] channel error')
+        else if (status === 'TIMED_OUT') console.warn('[Kanban Realtime] timed out')
+      })
+
+    channelRef.current = channel
+    return () => {
+      supabase.removeChannel(channel)
+      channelRef.current = null
+    }
+  }, [workspaceId, fetchNotes])
+
+  function broadcast() {
+    channelRef.current?.send({ type: 'broadcast', event: 'refresh', payload: {} })
+  }
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -68,18 +186,14 @@ export default function KanbanView({ initialColumns, initialNotes, workspaceId }
     const activeId = active.id as string
     const overId = over.id as string
 
-    // Determine target column
     const overIsColumn = columns.some((c) => c.id === overId)
     const targetColId = overIsColumn
       ? overId
       : notes.find((n) => n.id === overId)?.kanban_column_id ?? null
 
     if (!targetColId) return
-
     setNotes((prev) =>
-      prev.map((n) =>
-        n.id === activeId ? { ...n, kanban_column_id: targetColId } : n,
-      ),
+      prev.map((n) => n.id === activeId ? { ...n, kanban_column_id: targetColId } : n),
     )
   }
 
@@ -97,9 +211,7 @@ export default function KanbanView({ initialColumns, initialNotes, workspaceId }
       if (oldIdx !== newIdx) {
         const reordered = arrayMove(columns, oldIdx, newIdx)
         setColumns(reordered)
-        startTransition(() => {
-          reorderKanbanColumns(workspaceId, reordered.map((c) => c.id))
-        })
+        reorderKanbanColumns(workspaceId, reordered.map((c) => c.id)).then(broadcast)
       }
       return
     }
@@ -116,17 +228,14 @@ export default function KanbanView({ initialColumns, initialNotes, workspaceId }
 
       if (!targetColId) return
 
-      // Build final ordered list for target column
       let colNotes = notes
         .filter((n) => n.kanban_column_id === targetColId)
         .sort((a, b) => (a.kanban_position ?? 0) - (b.kanban_position ?? 0))
 
-      // Move active into target column if needed
       if (!colNotes.find((n) => n.id === active.id)) {
         colNotes = [...colNotes, { ...activeNote, kanban_column_id: targetColId }]
       }
 
-      // Reorder within column
       if (!overIsColumn) {
         const oldIdx = colNotes.findIndex((n) => n.id === active.id)
         const newIdx = colNotes.findIndex((n) => n.id === over.id)
@@ -135,7 +244,6 @@ export default function KanbanView({ initialColumns, initialNotes, workspaceId }
         }
       }
 
-      // Apply positions
       const updates = colNotes.map((n, i) => ({
         noteId: n.id,
         columnId: targetColId,
@@ -150,9 +258,7 @@ export default function KanbanView({ initialColumns, initialNotes, workspaceId }
         })
       })
 
-      startTransition(() => {
-        reorderKanbanNotes(workspaceId, updates)
-      })
+      reorderKanbanNotes(workspaceId, updates).then(broadcast)
     }
   }
 
@@ -163,11 +269,11 @@ export default function KanbanView({ initialColumns, initialNotes, workspaceId }
     setAddingCol(false)
     const result = await createKanbanColumn(workspaceId, name)
     if ('id' in result) {
-      // Optimistic: add placeholder; revalidatePath in action will refresh real data
       setColumns((prev) => [
         ...prev,
         { id: result.id, name, position: prev.length * 1000, color: null },
       ])
+      broadcast()
     }
   }
 

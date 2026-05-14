@@ -2,6 +2,8 @@ import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import GraphView, { type GraphNode, type GraphLink, type FolderLegendItem } from '@/components/graph/GraphView'
 
+export const dynamic = 'force-dynamic'
+
 const NODE_LIMIT = 500
 
 interface FolderRow { id: string; name: string; parent_id: string | null }
@@ -144,8 +146,8 @@ export default async function GraphPage({
 
       <div className="flex-1 min-h-0">
         <GraphView
-          nodes={nodes}
-          links={links}
+          initialNodes={nodes}
+          initialLinks={links}
           workspaceId={workspaceId}
           folderColors={folderColors}
           folderLegend={folderLegend}

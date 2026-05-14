@@ -3,6 +3,8 @@ import { notFound } from 'next/navigation'
 import TimelineView from '@/components/timeline/TimelineView'
 import type { NoteListItem } from '@/lib/types'
 
+export const dynamic = 'force-dynamic'
+
 export default async function TimelinePage({
   params,
 }: {

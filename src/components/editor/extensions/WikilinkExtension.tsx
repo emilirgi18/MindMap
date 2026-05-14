@@ -5,6 +5,7 @@ import { ReactNodeViewRenderer, NodeViewWrapper, type NodeViewProps } from '@tip
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { broadcastRefresh } from '@/lib/boardSync'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -80,6 +81,7 @@ function WikilinkView({ node, updateAttributes }: NodeViewProps) {
           { source_id: sourceNoteId, target_id: resolvedId },
           { onConflict: 'source_id,target_id', ignoreDuplicates: true }
         )
+        broadcastRefresh(workspaceId)
       }
 
       updateAttributes({ noteId: resolvedId, href: resolvedHref })
