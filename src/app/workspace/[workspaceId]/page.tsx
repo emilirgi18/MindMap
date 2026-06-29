@@ -24,7 +24,7 @@ export default async function WorkspacePage({
   return (
     <div className="flex-1 flex items-center justify-center text-center p-8">
       <div className="space-y-2">
-        <p className="text-gray-500 text-sm">No notes yet.</p>
+        <p className="text-slate-500 text-sm">No notes yet.</p>
         <p className="text-xs text-gray-600">
           Press <kbd className="px-1.5 py-0.5 rounded bg-[#1c2333] text-gray-400 font-mono text-xs">+</kbd> in the sidebar to create your first note.
         </p>

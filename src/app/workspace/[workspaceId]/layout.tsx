@@ -1,8 +1,9 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import Sidebar from '@/components/sidebar/Sidebar'
+import TopBar from '@/components/sidebar/TopBar'
 import { RouterProgress } from '@/components/RouterProgress'
-import type { WorkspaceWithRole, NoteListItem, FolderItem, UserProfile, KanbanColumnItem } from '@/lib/types'
+import type { WorkspaceWithRole, NoteListItem, FolderItem, UserProfile } from '@/lib/types'
 
 export default async function WorkspaceLayout({
   children,
@@ -19,36 +20,24 @@ export default async function WorkspaceLayout({
   } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  // Parallel fetch: workspaces+roles, notes (stable columns), folder assignments, folders table, profile, kanban columns
-  const [membershipsRes, notesRes, noteFolderRes, foldersRes, profileRes, kanbanColumnsRes] = await Promise.all([
+  // Parallel fetch: workspaces+roles, notes, folders, profile
+  const [membershipsRes, notesRes, foldersRes, profileRes] = await Promise.all([
     supabase
       .from('workspace_members')
       .select('role, workspaces(id, name, type, owner_id)')
       .eq('user_id', user.id),
-    // Stable columns — always succeeds even before the folders migration
     supabase
       .from('notes')
-      .select('id, title, dm_only, updated_at')
+      .select('id, title, dm_only, updated_at, folder_id')
       .eq('workspace_id', workspaceId)
       .order('updated_at', { ascending: false })
       .limit(200),
-    // folder_id — only exists after folders migration; errors silently ignored below
-    supabase
-      .from('notes')
-      .select('id, folder_id')
-      .eq('workspace_id', workspaceId),
-    // folders table — only exists after migration; errors are silently ignored below
     supabase
       .from('folders')
       .select('id, name, parent_id')
       .eq('workspace_id', workspaceId)
       .order('created_at', { ascending: true }),
     supabase.from('profiles').select('id, full_name, email').eq('id', user.id).single(),
-    supabase
-      .from('kanban_columns')
-      .select('id, name, position, color')
-      .eq('workspace_id', workspaceId)
-      .order('position', { ascending: true }),
   ])
 
   // Fetch tags for all notes in this workspace (used for tag-based search)
@@ -81,10 +70,7 @@ export default async function WorkspaceLayout({
   const current = workspaces.find((w) => w.id === workspaceId)
   if (!current) redirect('/')
 
-  // Merge folder_id and tags into notes
-  const folderMap = new Map(
-    (noteFolderRes.data ?? []).map((n) => [n.id, (n as { id: string; folder_id?: string | null }).folder_id ?? null])
-  )
+  // Build tags map
   const tagsMap = new Map<string, string[]>()
   for (const row of (tagsRes.data ?? [])) {
     const r = row as { note_id: string; name: string }
@@ -93,15 +79,17 @@ export default async function WorkspaceLayout({
     tagsMap.set(r.note_id, arr)
   }
   const notes: NoteListItem[] = (notesRes.data ?? []).map((n) => ({
-    ...(n as NoteListItem),
-    folder_id: folderMap.get(n.id) ?? null,
+    id: n.id,
+    title: n.title,
+    dm_only: n.dm_only,
+    updated_at: n.updated_at,
+    folder_id: (n.folder_id as string | null) ?? null,
     kanban_column_id: null,
     kanban_position: null,
     timeline_position: null,
     tags: tagsMap.get(n.id) ?? [],
   }))
   const folders: FolderItem[] = (foldersRes.data ?? []) as FolderItem[]
-  const kanbanColumns: KanbanColumnItem[] = (kanbanColumnsRes.data ?? []) as KanbanColumnItem[]
 
   const profile: UserProfile = profileRes.data ?? {
     id: user.id,
@@ -112,21 +100,26 @@ export default async function WorkspaceLayout({
   const isAdmin = !!process.env.ADMIN_USER_ID && user.id === process.env.ADMIN_USER_ID
 
   return (
-    <div className="h-screen flex overflow-hidden bg-[#0f1117]">
+    <div className="h-screen flex flex-col overflow-hidden bg-[#0f1117]">
       <RouterProgress />
-      <Sidebar
+      <TopBar
         workspaces={workspaces}
-        notes={notes}
-        folders={folders}
-        kanbanColumns={kanbanColumns}
         currentWorkspaceId={workspaceId}
         currentRole={current.role}
         profile={profile}
         isAdmin={isAdmin}
       />
-      <main className="flex-1 min-w-0 flex flex-col overflow-hidden">
-        {children}
-      </main>
+      <div className="flex-1 min-w-0 flex overflow-hidden">
+        <Sidebar
+          notes={notes}
+          folders={folders}
+          workspaceId={workspaceId}
+          currentRole={current.role}
+        />
+        <main className="flex-1 min-w-0 flex flex-col overflow-hidden">
+          {children}
+        </main>
+      </div>
     </div>
   )
 }

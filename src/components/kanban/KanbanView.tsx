@@ -21,7 +21,6 @@ import KanbanColumn from './KanbanColumn'
 import { KanbanCardOverlay } from './KanbanCard'
 import { createKanbanColumn, reorderKanbanColumns, reorderKanbanNotes } from '@/lib/actions/kanban'
 import { createClient } from '@/lib/supabase/client'
-import { getRecentUpdate, subscribeBoardUpdates } from '@/lib/boardSync'
 import type { NoteListItem, KanbanColumnItem } from '@/lib/types'
 import type { RealtimeChannel } from '@supabase/supabase-js'
 
@@ -64,13 +63,10 @@ export default function KanbanView({ initialColumns, initialNotes, workspaceId }
     setNotes(data.map((n) => ({ ...n, tags: tagsMap.get(n.id) ?? [] }) as NoteListItem))
   }, [workspaceId])
 
-  // Mount: immediate fetch + delayed fallback + same-tab event bus
   useEffect(() => {
     fetchNotes()
-    const recentUpdate = getRecentUpdate(workspaceId)
-    const timer = setTimeout(fetchNotes, recentUpdate ? 500 : 2000)
-    const unsub = subscribeBoardUpdates(workspaceId, fetchNotes)
-    return () => { clearTimeout(timer); unsub() }
+    const timer = setTimeout(fetchNotes, 2000)
+    return () => clearTimeout(timer)
   }, [workspaceId, fetchNotes])
 
   // Realtime: postgres_changes + broadcast (cross-tab)
@@ -90,8 +86,6 @@ export default function KanbanView({ initialColumns, initialNotes, workspaceId }
           const row = (payload.new ?? {}) as any
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const oldRow = (payload.old ?? {}) as any
-
-          console.log('[Kanban Realtime] postgres_changes:', eventType, row.id)
 
           if (eventType === 'DELETE') {
             setNotes((prev) => prev.filter((n) => n.id !== oldRow.id))
@@ -134,17 +128,8 @@ export default function KanbanView({ initialColumns, initialNotes, workspaceId }
           })
         },
       )
-      // Broadcast: another tab sent a refresh signal — just re-fetch
-      .on('broadcast', { event: 'refresh' }, () => {
-        console.log('[Kanban Realtime] broadcast refresh received')
-        fetchNotes()
-      })
-      .subscribe((status, err) => {
-        if (err) console.error('[Kanban Realtime] error:', err)
-        else if (status === 'SUBSCRIBED') console.log('[Kanban Realtime] subscribed ✓')
-        else if (status === 'CHANNEL_ERROR') console.error('[Kanban Realtime] channel error')
-        else if (status === 'TIMED_OUT') console.warn('[Kanban Realtime] timed out')
-      })
+      .on('broadcast', { event: 'refresh' }, () => { fetchNotes() })
+      .subscribe()
 
     channelRef.current = channel
     return () => {

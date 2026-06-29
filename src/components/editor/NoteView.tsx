@@ -53,25 +53,30 @@ interface CollabState {
   provider: SupabaseProvider
 }
 
-let activeCollab: CollabState | null = null
-
-function getOrCreateCollab(note: NoteData, profile: UserProfile): CollabState {
-  if (activeCollab && activeCollab.noteId === note.id) return activeCollab
-  activeCollab?.provider.destroy()
-  activeCollab?.ydoc.destroy()
-  const ydoc = new Y.Doc()
-  if (note.yjs_state) Y.applyUpdate(ydoc, fromBase64(note.yjs_state))
-  const supabase = createClient()
-  const provider = new SupabaseProvider({ doc: ydoc, supabase, channelName: note.id })
-  provider.setUser({ name: profile.full_name ?? profile.email, color: getUserColor(profile.id) })
-  activeCollab = { noteId: note.id, ydoc, provider }
-  return activeCollab
-}
-
 export default function NoteView({ note, role, profile, kanbanColumns = [] }: Props) {
   const router = useRouter()
   const supabase = createClient()
-  const { ydoc, provider } = getOrCreateCollab(note, profile)
+
+  const collabRef = useRef<CollabState | null>(null)
+  if (!collabRef.current || collabRef.current.noteId !== note.id) {
+    collabRef.current?.provider.destroy()
+    collabRef.current?.ydoc.destroy()
+    const ydoc = new Y.Doc()
+    if (note.yjs_state) Y.applyUpdate(ydoc, fromBase64(note.yjs_state))
+    const supabaseClient = createClient()
+    const provider = new SupabaseProvider({ doc: ydoc, supabase: supabaseClient, channelName: note.id })
+    provider.setUser({ name: profile.full_name ?? profile.email, color: getUserColor(profile.id) })
+    collabRef.current = { noteId: note.id, ydoc, provider }
+  }
+  const { ydoc, provider } = collabRef.current
+
+  useEffect(() => {
+    return () => {
+      collabRef.current?.provider.destroy()
+      collabRef.current?.ydoc.destroy()
+      collabRef.current = null
+    }
+  }, [])
 
   const [title, setTitle] = useState(note.title)
   const [dmOnly, setDmOnly] = useState(note.dm_only)
@@ -86,9 +91,10 @@ export default function NoteView({ note, role, profile, kanbanColumns = [] }: Pr
     await setNoteDmOnly(note.id, note.workspace_id, next)
   }
 
-  const titleTimer = useRef<ReturnType<typeof setTimeout>>()
-  const snapTimer  = useRef<ReturnType<typeof setTimeout>>()
-  const editorRef  = useRef<ReturnType<typeof useEditor>>(null)
+  const titleTimer      = useRef<ReturnType<typeof setTimeout>>()
+  const snapTimer       = useRef<ReturnType<typeof setTimeout>>()
+  const editorRef       = useRef<ReturnType<typeof useEditor>>(null)
+  const titleEditingRef = useRef(false)
 
   const flushSnapshot = useCallback(async () => {
     const ed = editorRef.current
@@ -173,7 +179,7 @@ export default function NoteView({ note, role, profile, kanbanColumns = [] }: Pr
 
   useEffect(() => { editorRef.current = editor }, [editor])
   useEffect(() => { if (!editor || note.yjs_state || !note.body) return; editor.commands.setContent(note.body) }, [editor]) // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => { setTitle(note.title); setSaveStatus('saved') }, [note.id, note.title])
+  useEffect(() => { if (!titleEditingRef.current) setTitle(note.title); setSaveStatus('saved') }, [note.id, note.title])
 
   function handleTitleChange(e: React.ChangeEvent<HTMLInputElement>) {
     const val = e.target.value
@@ -181,14 +187,21 @@ export default function NoteView({ note, role, profile, kanbanColumns = [] }: Pr
     setSaveStatus('unsaved')
     clearTimeout(titleTimer.current)
     titleTimer.current = setTimeout(async () => {
-      await supabase.from('notes').update({ title: val }).eq('id', note.id)
-      setSaveStatus('saved')
-      router.refresh()
+      const { error } = await supabase.from('notes').update({ title: val }).eq('id', note.id)
+      setSaveStatus(error ? 'unsaved' : 'saved')
     }, 500)
   }
 
   function handleTitleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     if (e.key === 'Enter') { e.preventDefault(); editor?.commands.focus('start') }
+  }
+
+  async function handleTitleBlur() {
+    titleEditingRef.current = false
+    clearTimeout(titleTimer.current)
+    const { error } = await supabase.from('notes').update({ title }).eq('id', note.id)
+    setSaveStatus(error ? 'unsaved' : 'saved')
+    router.refresh()
   }
 
   const canEdit = role !== 'player' || !note.dm_only
@@ -203,6 +216,8 @@ export default function NoteView({ note, role, profile, kanbanColumns = [] }: Pr
             value={title}
             onChange={handleTitleChange}
             onKeyDown={handleTitleKeyDown}
+            onFocus={() => { titleEditingRef.current = true }}
+            onBlur={handleTitleBlur}
             disabled={!canEdit}
             placeholder="Untitled"
             className="flex-1 min-w-0 bg-transparent text-3xl font-bold text-white placeholder-slate-700 focus:outline-none disabled:cursor-default"

@@ -61,9 +61,9 @@ export default async function KanbanPage({
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      <div className="px-6 py-4 border-b border-[#2a3347] flex-shrink-0">
+      <div className="px-6 py-4 border-b border-[#334155] flex-shrink-0">
         <h1 className="text-lg font-semibold text-white">Kanban Board</h1>
-        <p className="text-xs text-gray-500 mt-0.5">
+        <p className="text-xs text-slate-500 mt-0.5">
           {columns.length} column{columns.length !== 1 ? 's' : ''} · {notes.length} card{notes.length !== 1 ? 's' : ''}
         </p>
       </div>

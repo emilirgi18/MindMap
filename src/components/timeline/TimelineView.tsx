@@ -22,29 +22,12 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { reorderTimeline } from '@/lib/actions/kanban'
 import { createClient } from '@/lib/supabase/client'
-import { getRecentUpdate, subscribeBoardUpdates } from '@/lib/boardSync'
+import { excerpt } from '@/lib/utils'
 import type { NoteListItem } from '@/lib/types'
 
 interface Props {
   initialNotes: NoteListItem[]
   workspaceId: string
-}
-
-function excerpt(body: string | undefined, max = 120): string {
-  if (!body) return ''
-  const text = body
-    .replace(/^#{1,6}\s+/gm, '')
-    .replace(/\*\*(.+?)\*\*/g, '$1')
-    .replace(/\*(.+?)\*/g, '$1')
-    .replace(/`{1,3}[^`]*`{1,3}/g, '')
-    .replace(/!\[.*?\]\(.*?\)/g, '')
-    .replace(/\[(.+?)\]\(.*?\)/g, '$1')
-    .replace(/^[-*+]\s+/gm, '')
-    .replace(/^\d+\.\s+/gm, '')
-    .replace(/^>\s+/gm, '')
-    .replace(/\n+/g, ' ')
-    .trim()
-  return text.length > max ? text.slice(0, max).trimEnd() + '…' : text
 }
 
 export default function TimelineView({ initialNotes, workspaceId }: Props) {
@@ -79,13 +62,10 @@ export default function TimelineView({ initialNotes, workspaceId }: Props) {
     setNotes(data.map((n) => ({ ...n, tags: tagsMap.get(n.id) ?? [] }) as NoteListItem))
   }, [workspaceId])
 
-  // Mount: immediate fetch + delayed fallback + same-tab event bus
   useEffect(() => {
     fetchNotes()
-    const recentUpdate = getRecentUpdate(workspaceId)
-    const timer = setTimeout(fetchNotes, recentUpdate ? 500 : 2000)
-    const unsub = subscribeBoardUpdates(workspaceId, fetchNotes)
-    return () => { clearTimeout(timer); unsub() }
+    const timer = setTimeout(fetchNotes, 2000)
+    return () => clearTimeout(timer)
   }, [workspaceId, fetchNotes])
 
   useEffect(() => {
@@ -150,16 +130,8 @@ export default function TimelineView({ initialNotes, workspaceId }: Props) {
           })
         },
       )
-      .on('broadcast', { event: 'refresh' }, () => {
-        console.log('[Timeline Realtime] broadcast refresh received')
-        fetchNotes()
-      })
-      .subscribe((status, err) => {
-        if (err) console.error('[Timeline Realtime] error:', err)
-        else if (status === 'SUBSCRIBED') console.log('[Timeline Realtime] subscribed ✓')
-        else if (status === 'CHANNEL_ERROR') console.error('[Timeline Realtime] channel error')
-        else if (status === 'TIMED_OUT') console.warn('[Timeline Realtime] timed out')
-      })
+      .on('broadcast', { event: 'refresh' }, () => { fetchNotes() })
+      .subscribe()
 
     channelRef.current = channel
     return () => { supabase.removeChannel(channel); channelRef.current = null }

@@ -56,9 +56,9 @@ export default async function TimelinePage({
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      <div className="px-6 py-4 border-b border-[#2a3347] flex-shrink-0">
+      <div className="px-6 py-4 border-b border-[#334155] flex-shrink-0">
         <h1 className="text-lg font-semibold text-white">Timeline</h1>
-        <p className="text-xs text-gray-500 mt-0.5">
+        <p className="text-xs text-slate-500 mt-0.5">
           {notes.length} event{notes.length !== 1 ? 's' : ''}
         </p>
       </div>

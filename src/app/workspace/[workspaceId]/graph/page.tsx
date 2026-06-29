@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import GraphView, { type GraphNode, type GraphLink, type FolderLegendItem } from '@/components/graph/GraphView'
+import GraphPageClient from '@/components/graph/GraphPageClient'
+import { type GraphNode, type GraphLink, type FolderLegendItem } from '@/components/graph/GraphView'
 
 export const dynamic = 'force-dynamic'
 
@@ -131,29 +132,17 @@ export default async function GraphPage({
     .map((l) => ({ source: l.source_id, target: l.target_id }))
 
   return (
-    <div className="flex flex-col h-full overflow-hidden">
-      <div className="px-6 h-11 flex items-center gap-3 border-b border-[#334155] flex-shrink-0">
-        <span className="text-sm font-medium text-slate-300">Graph</span>
-        <span className="text-xs text-slate-600">
-          {nodes.length} notes · {links.length} links
-        </span>
-        {rawNotes.length === NODE_LIMIT && (
-          <span className="text-xs text-orange-500/80">
-            Showing first {NODE_LIMIT} notes
-          </span>
-        )}
-      </div>
-
-      <div className="flex-1 min-h-0">
-        <GraphView
-          initialNodes={nodes}
-          initialLinks={links}
-          workspaceId={workspaceId}
-          folderColors={folderColors}
-          folderLegend={folderLegend}
-          hasUnfolderedNotes={hasUnfolderedNotes}
-        />
-      </div>
-    </div>
+    <GraphPageClient
+      initialNodes={nodes}
+      initialLinks={links}
+      workspaceId={workspaceId}
+      folderColors={folderColors}
+      folderLegend={folderLegend}
+      hasUnfolderedNotes={hasUnfolderedNotes}
+      nodeCount={nodes.length}
+      linkCount={links.length}
+      atNodeLimit={rawNotes.length === NODE_LIMIT}
+      nodeLimit={NODE_LIMIT}
+    />
   )
 }
