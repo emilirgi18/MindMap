@@ -19,6 +19,7 @@ import PresenceBar from './PresenceBar'
 import NoteLinksPanel from './NoteLinksPanel'
 import TagsPanel from './TagsPanel'
 import BoardPanel from './BoardPanel'
+import NoteGraphPanel from './NoteGraphPanel'
 import { setNoteDmOnly } from '@/lib/actions/notes'
 import type { KanbanColumnItem } from '@/lib/types'
 
@@ -85,6 +86,7 @@ export default function NoteView({ note, role, profile, kanbanColumns = [] }: Pr
   const [dmOnly, setDmOnly] = useState(note.dm_only)
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('saved')
   const [imageError, setImageError] = useState<string | null>(null)
+  const [showGraph, setShowGraph] = useState(false)
 
   const canToggleDm = role === 'owner' || role === 'dm'
 
@@ -251,6 +253,15 @@ export default function NoteView({ note, role, profile, kanbanColumns = [] }: Pr
               </div>
             )}
             <PresenceBar provider={collab?.provider ?? null} />
+            <button
+              onClick={() => setShowGraph((v) => !v)}
+              title={showGraph ? 'Hide linked graph' : 'Show linked graph'}
+              className={`p-1.5 rounded-md transition-colors ${
+                showGraph ? 'text-orange-400 bg-slate-700/40' : 'text-slate-600 hover:text-orange-400 hover:bg-slate-700/40'
+              }`}
+            >
+              <GraphIcon className="h-4 w-4" />
+            </button>
             <span className={`text-xs tabular-nums transition-colors ${
               saveStatus === 'saved' ? 'text-slate-600' : saveStatus === 'saving' ? 'text-slate-500' : 'text-orange-500/80'
             }`}>
@@ -275,26 +286,40 @@ export default function NoteView({ note, role, profile, kanbanColumns = [] }: Pr
         </div>
       )}
 
-      {/* Editor + bottom panels */}
-      <div className="flex-1 overflow-y-auto px-10 py-4">
-        <EditorContent editor={editor} />
-        <div className="mt-6 pt-5 border-t border-[#334155] flex gap-10">
-          <div className="flex-1 min-w-0">
-            <NoteLinksPanel noteId={note.id} workspaceId={note.workspace_id} canEdit={canEdit} />
-          </div>
-          <div className="w-56 flex-shrink-0 flex flex-col gap-6">
-            <TagsPanel noteId={note.id} workspaceId={note.workspace_id} canEdit={canEdit} />
-            <BoardPanel
-              noteId={note.id}
-              workspaceId={note.workspace_id}
-              kanbanColumns={kanbanColumns}
-              initialKanbanColumnId={note.kanban_column_id ?? null}
-              initialOnTimeline={note.timeline_position != null}
-            />
+      {/* Editor + bottom panels, with an optional right-side linked-graph panel */}
+      <div className="flex-1 min-h-0 flex gap-4 px-10 py-4">
+        <div className="flex-1 min-w-0 overflow-y-auto">
+          <EditorContent editor={editor} />
+          <div className="mt-6 pt-5 border-t border-[#334155] flex gap-10">
+            <div className="flex-1 min-w-0">
+              <NoteLinksPanel noteId={note.id} workspaceId={note.workspace_id} canEdit={canEdit} />
+            </div>
+            <div className="w-56 flex-shrink-0 flex flex-col gap-6">
+              <TagsPanel noteId={note.id} workspaceId={note.workspace_id} canEdit={canEdit} />
+              <BoardPanel
+                noteId={note.id}
+                workspaceId={note.workspace_id}
+                kanbanColumns={kanbanColumns}
+                initialKanbanColumnId={note.kanban_column_id ?? null}
+                initialOnTimeline={note.timeline_position != null}
+              />
+            </div>
           </div>
         </div>
+        {showGraph && <NoteGraphPanel noteId={note.id} workspaceId={note.workspace_id} />}
       </div>
     </div>
+  )
+}
+
+function GraphIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 20 20" fill="currentColor" aria-hidden>
+      <circle cx="4" cy="10" r="2" />
+      <circle cx="16" cy="5" r="2" />
+      <circle cx="16" cy="15" r="2" />
+      <path d="M5.7 9.1l8.6-3.5M5.7 10.9l8.6 3.5" stroke="currentColor" strokeWidth="1.3" fill="none" />
+    </svg>
   )
 }
 
