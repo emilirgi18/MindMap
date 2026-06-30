@@ -59,6 +59,7 @@ export default async function NotePage({
 
   return (
     <NoteView
+      key={noteId}
       note={fullNote}
       role={(role as string | null) ?? 'player'}
       profile={profile ?? { id: user.id, full_name: null, email: user.email ?? '' }}

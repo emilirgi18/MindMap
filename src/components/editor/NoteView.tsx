@@ -13,6 +13,7 @@ import * as Y from 'yjs'
 import { SupabaseProvider } from '@/lib/yjs/SupabaseProvider'
 import { fromBase64, toBase64, getUserColor } from '@/lib/yjs/utils'
 import { createClient } from '@/lib/supabase/client'
+import { WikilinkExtension } from './extensions/WikilinkExtension'
 import Toolbar from './Toolbar'
 import PresenceBar from './PresenceBar'
 import NoteLinksPanel from './NoteLinksPanel'
@@ -57,26 +58,28 @@ export default function NoteView({ note, role, profile, kanbanColumns = [] }: Pr
   const router = useRouter()
   const supabase = createClient()
 
-  const collabRef = useRef<CollabState | null>(null)
-  if (!collabRef.current || collabRef.current.noteId !== note.id) {
-    collabRef.current?.provider.destroy()
-    collabRef.current?.ydoc.destroy()
+  // Created and destroyed together in one effect (rather than split between
+  // render-body creation and an effect-only cleanup) so the pairing survives
+  // React StrictMode's dev-only mount→cleanup→mount cycle. With the old split
+  // setup, that cycle destroyed the Y.Doc the editor's Collaboration extension
+  // was already bound to, leaving the autosave listener attached to an
+  // orphaned doc that never received edits — so the body silently never saved.
+  const [collab, setCollab] = useState<CollabState | null>(null)
+
+  useEffect(() => {
     const ydoc = new Y.Doc()
     if (note.yjs_state) Y.applyUpdate(ydoc, fromBase64(note.yjs_state))
     const supabaseClient = createClient()
     const provider = new SupabaseProvider({ doc: ydoc, supabase: supabaseClient, channelName: note.id })
     provider.setUser({ name: profile.full_name ?? profile.email, color: getUserColor(profile.id) })
-    collabRef.current = { noteId: note.id, ydoc, provider }
-  }
-  const { ydoc, provider } = collabRef.current
+    setCollab({ noteId: note.id, ydoc, provider })
 
-  useEffect(() => {
     return () => {
-      collabRef.current?.provider.destroy()
-      collabRef.current?.ydoc.destroy()
-      collabRef.current = null
+      provider.destroy()
+      ydoc.destroy()
     }
-  }, [])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [note.id])
 
   const [title, setTitle] = useState(note.title)
   const [dmOnly, setDmOnly] = useState(note.dm_only)
@@ -98,10 +101,10 @@ export default function NoteView({ note, role, profile, kanbanColumns = [] }: Pr
 
   const flushSnapshot = useCallback(async () => {
     const ed = editorRef.current
-    if (!ed || ed.isDestroyed) return
+    if (!ed || ed.isDestroyed || !collab) return
     setSaveStatus('saving')
     try {
-      const yjsState = toBase64(Y.encodeStateAsUpdate(ydoc))
+      const yjsState = toBase64(Y.encodeStateAsUpdate(collab.ydoc))
       const body = ed.storage.markdown?.getMarkdown?.() ?? ''
       const { error } = await supabase.from('notes').update({ yjs_state: yjsState, body }).eq('id', note.id)
       setSaveStatus(error ? 'unsaved' : 'saved')
@@ -110,9 +113,11 @@ export default function NoteView({ note, role, profile, kanbanColumns = [] }: Pr
       console.error('Save threw:', err)
       setSaveStatus('unsaved')
     }
-  }, [ydoc, supabase, note.id])
+  }, [collab, supabase, note.id])
 
   useEffect(() => {
+    if (!collab) return
+    const ydoc = collab.ydoc
     function handleDocUpdate() {
       setSaveStatus('unsaved')
       clearTimeout(snapTimer.current)
@@ -120,7 +125,7 @@ export default function NoteView({ note, role, profile, kanbanColumns = [] }: Pr
     }
     ydoc.on('update', handleDocUpdate)
     return () => { ydoc.off('update', handleDocUpdate); clearTimeout(snapTimer.current) }
-  }, [ydoc, flushSnapshot])
+  }, [collab, flushSnapshot])
 
   async function uploadImage(file: File): Promise<string> {
     const ext = file.name.split('.').pop() ?? 'png'
@@ -149,11 +154,15 @@ export default function NoteView({ note, role, profile, kanbanColumns = [] }: Pr
       Markdown.configure({ html: false, tightLists: true, bulletListMarker: '-' }),
       ImageExt.configure({ inline: false, allowBase64: false }),
       Placeholder.configure({ placeholder: 'Start writing…' }),
-      Collaboration.configure({ document: ydoc }),
-      CollaborationCursor.configure({ provider }),
+      ...(collab ? [Collaboration.configure({ document: collab.ydoc }), CollaborationCursor.configure({ provider: collab.provider })] : []),
+      WikilinkExtension,
     ],
     editorProps: {
-      attributes: { class: 'prose prose-invert max-w-none focus:outline-none min-h-[60vh] py-1' },
+      attributes: {
+        class: 'prose prose-invert max-w-none focus:outline-none min-h-[60vh] py-1',
+        'data-workspace-id': note.workspace_id,
+        'data-note-id': note.id,
+      },
       handlePaste(_view, event) {
         const items = Array.from(event.clipboardData?.items ?? [])
         const img = items.find((i) => i.type.startsWith('image/'))
@@ -175,7 +184,7 @@ export default function NoteView({ note, role, profile, kanbanColumns = [] }: Pr
         return true
       },
     },
-  })
+  }, [collab])
 
   useEffect(() => { editorRef.current = editor }, [editor])
   useEffect(() => { if (!editor || note.yjs_state || !note.body) return; editor.commands.setContent(note.body) }, [editor]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -241,7 +250,7 @@ export default function NoteView({ note, role, profile, kanbanColumns = [] }: Pr
                 )}
               </div>
             )}
-            <PresenceBar provider={provider} />
+            <PresenceBar provider={collab?.provider ?? null} />
             <span className={`text-xs tabular-nums transition-colors ${
               saveStatus === 'saved' ? 'text-slate-600' : saveStatus === 'saving' ? 'text-slate-500' : 'text-orange-500/80'
             }`}>

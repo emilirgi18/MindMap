@@ -68,11 +68,9 @@ export async function deleteNote(noteId: string, workspaceId: string): Promise<{
   try {
     const supabase = createClient()
 
-    // Auth check
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return { error: 'Not authenticated' }
 
-    // Workspace membership check — any member can delete notes
     const { data: member } = await supabase
       .from('workspace_members')
       .select('role')
@@ -81,10 +79,13 @@ export async function deleteNote(noteId: string, workspaceId: string): Promise<{
       .single()
     if (!member) return { error: 'Not a workspace member' }
 
+    // Soft-deleting sets deleted_at, which makes the row fail the "deleted_at
+    // is null" select policy — Postgres enforces that same select policy on
+    // the implicit RETURNING of an UPDATE under RLS, so this must run via the
+    // service-role client (with membership/role already checked above).
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const admin = createAdminClient() as any
 
-    // Verify note belongs to this workspace and check dm_only restriction
     const { data: note } = await admin
       .from('notes')
       .select('id, dm_only')
@@ -94,20 +95,11 @@ export async function deleteNote(noteId: string, workspaceId: string): Promise<{
     if (!note) return { error: 'Note not found' }
     if (note.dm_only && member.role === 'player') return { error: 'Only the DM can delete DM-only notes' }
 
-    // Try soft delete first (requires migration 5 — deleted_at column)
-    const { error: softErr } = await admin
+    const { error: err } = await admin
       .from('notes')
       .update({ deleted_at: new Date().toISOString() })
       .eq('id', noteId)
-
-    if (!softErr) {
-      revalidatePath(`/workspace/${workspaceId}`, 'layout')
-      return {}
-    }
-
-    // deleted_at column not in DB yet — hard delete (admin bypasses cascade-RLS on note_links/tags)
-    const { error: hardErr } = await admin.from('notes').delete().eq('id', noteId)
-    if (hardErr) return { error: hardErr.message }
+    if (err) return { error: err.message }
 
     revalidatePath(`/workspace/${workspaceId}`, 'layout')
     return {}

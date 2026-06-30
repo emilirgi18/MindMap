@@ -1,6 +1,6 @@
 'use client'
 
-import { Node, InputRule, mergeAttributes, type InputRuleMatch } from '@tiptap/core'
+import { Node, InputRule, mergeAttributes } from '@tiptap/core'
 import { ReactNodeViewRenderer, NodeViewWrapper, type NodeViewProps } from '@tiptap/react'
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
@@ -17,11 +17,6 @@ interface WikilinkAttrs {
   href: string | null
 }
 
-interface WikilinkOptions {
-  workspaceId: string
-  sourceNoteId: string
-}
-
 // ---------------------------------------------------------------------------
 // React node view
 // ---------------------------------------------------------------------------
@@ -31,6 +26,7 @@ function WikilinkView({ node, updateAttributes }: NodeViewProps) {
   const router = useRouter()
   const supabase = createClient()
   const [resolving, setResolving] = useState(!attrs.noteId)
+  const [creating, setCreating] = useState(false)
   const didResolve = useRef(false)
 
   const { title, noteId, href } = attrs
@@ -40,51 +36,37 @@ function WikilinkView({ node, updateAttributes }: NodeViewProps) {
     didResolve.current = true
 
     async function resolve() {
-      // Read workspaceId from a data attribute on the editor root element
-      // (injected via editorProps.attributes in NoteView)
       const editorEl = document.querySelector('[data-workspace-id]')
       const workspaceId = editorEl?.getAttribute('data-workspace-id') ?? ''
       const sourceNoteId = editorEl?.getAttribute('data-note-id') ?? ''
 
-      if (!workspaceId) return
+      if (!workspaceId) { setResolving(false); return }
 
-      // Look up existing note by title (case-insensitive)
-      let { data: existing } = await supabase
+      const { data: existing } = await supabase
         .from('notes')
         .select('id')
         .eq('workspace_id', workspaceId)
         .ilike('title', title)
+        .is('deleted_at', null)
         .maybeSingle()
 
-      let resolvedId = existing?.id ?? null
-
-      // Create stub note if none found
-      if (!resolvedId) {
-        const { data: created } = await supabase
-          .from('notes')
-          .insert({ workspace_id: workspaceId, title, body: '' })
-          .select('id')
-          .single()
-        resolvedId = created?.id ?? null
-      }
-
-      if (!resolvedId) {
+      if (!existing) {
+        // Note doesn't exist — show as unresolved, don't auto-create
         setResolving(false)
         return
       }
 
-      const resolvedHref = `/workspace/${workspaceId}/note/${resolvedId}`
+      const resolvedHref = `/workspace/${workspaceId}/note/${existing.id}`
 
-      // Upsert note_links row
       if (sourceNoteId) {
         await supabase.from('note_links').upsert(
-          { source_id: sourceNoteId, target_id: resolvedId },
-          { onConflict: 'source_id,target_id', ignoreDuplicates: true }
+          { source_id: sourceNoteId, target_id: existing.id },
+          { onConflict: 'source_id,target_id', ignoreDuplicates: true },
         )
         broadcastRefresh(workspaceId)
       }
 
-      updateAttributes({ noteId: resolvedId, href: resolvedHref })
+      updateAttributes({ noteId: existing.id, href: resolvedHref })
       setResolving(false)
     }
 
@@ -96,15 +78,54 @@ function WikilinkView({ node, updateAttributes }: NodeViewProps) {
     if (href) router.push(href)
   }
 
+  async function handleCreate(e: React.MouseEvent) {
+    e.preventDefault()
+    const editorEl = document.querySelector('[data-workspace-id]')
+    const workspaceId = editorEl?.getAttribute('data-workspace-id') ?? ''
+    const sourceNoteId = editorEl?.getAttribute('data-note-id') ?? ''
+    if (!workspaceId) return
+
+    setCreating(true)
+    const { data: created } = await supabase
+      .from('notes')
+      .insert({ workspace_id: workspaceId, title, body: '' })
+      .select('id')
+      .single()
+
+    if (!created) { setCreating(false); return }
+
+    const resolvedHref = `/workspace/${workspaceId}/note/${created.id}`
+
+    if (sourceNoteId) {
+      await supabase.from('note_links').upsert(
+        { source_id: sourceNoteId, target_id: created.id },
+        { onConflict: 'source_id,target_id', ignoreDuplicates: true },
+      )
+    }
+
+    broadcastRefresh(workspaceId)
+    updateAttributes({ noteId: created.id, href: resolvedHref })
+    router.push(resolvedHref)
+  }
+
   return (
     <NodeViewWrapper as="span" className="wikilink-wrapper">
-      {resolving || !href ? (
-        <span className="text-gray-500 cursor-default">[[{title}]]</span>
+      {resolving ? (
+        <span className="text-slate-500 cursor-default animate-pulse">[[{title}]]</span>
+      ) : !href ? (
+        <button
+          onClick={handleCreate}
+          disabled={creating}
+          title="Note not found — click to create it"
+          className="text-slate-500 hover:text-orange-400 underline decoration-dashed underline-offset-2 cursor-pointer transition-colors disabled:opacity-50"
+        >
+          [[{title}]]
+        </button>
       ) : (
         <a
           href={href}
           onClick={handleClick}
-          className="text-indigo-400 hover:text-indigo-300 hover:underline cursor-pointer"
+          className="text-orange-400 hover:text-orange-300 hover:underline cursor-pointer"
           data-wikilink={title}
         >
           [[{title}]]
@@ -118,19 +139,14 @@ function WikilinkView({ node, updateAttributes }: NodeViewProps) {
 // TipTap extension
 // ---------------------------------------------------------------------------
 
-// Match [[...]] at end of input but not inside an existing wikilink
 const WIKILINK_INPUT_REGEX = /\[\[([^\[\]\n]+)\]\]$/
 
-export const WikilinkExtension = Node.create<WikilinkOptions>({
+export const WikilinkExtension = Node.create({
   name: 'wikilink',
   group: 'inline',
   inline: true,
   atom: true,
   selectable: true,
-
-  addOptions() {
-    return { workspaceId: '', sourceNoteId: '' }
-  },
 
   addAttributes() {
     return {
@@ -182,25 +198,19 @@ export const WikilinkExtension = Node.create<WikilinkOptions>({
           const title = (match[1] as string | undefined)?.trim()
           if (!title) return null
           const wikiNode = this.type.create({ title, noteId: null, href: null })
-          // Return the transaction so TipTap applies it atomically.
-          // Using chain() here dispatches independently and returns null,
-          // which causes TipTap to revert the insertion.
           return state.tr.replaceWith(range.from, range.to, wikiNode)
         },
       }),
     ]
   },
 
-  // Serialize back to [[title]] in Markdown
   addStorage() {
     return {
       markdown: {
         serialize(state: { write: (s: string) => void }, node: { attrs: WikilinkAttrs }) {
           state.write(`[[${node.attrs.title}]]`)
         },
-        parse: {
-          // Handled by parseHTML when loading from body
-        },
+        parse: {},
       },
     }
   },
