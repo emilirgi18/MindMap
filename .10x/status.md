@@ -8,11 +8,11 @@ See `.10x/reviews/2026-11-24-discovery-review.md`.
 - ~~[CRITICAL] Users can self-approve via `profiles: own update` policy~~ fixed (ADR-001, not yet applied)
 - ~~[CRITICAL] Any approved user can list every pending invite token~~ fixed (ADR-001, not yet applied)
 - ~~[HIGH] Collab broadcast channels are public: DM-only note edits leak~~ fixed (ADR-001, not yet applied)
-- [HIGH] Invite flow for brand-new (unapproved) users looks broken
+- ~~[HIGH] Invite flow for brand-new (unapproved) users looks broken~~ fixed (ADR-002, not yet applied)
 - [HIGH] Yjs has no initial-sync handshake, so last-writer-wins snapshots can drop edits
 - [MED] Images use getPublicUrl on a private bucket
 - [MED] Live DB has drifted from migrations (see migration 000009 comment)
 - [MED] No tests, no CI
 
 ## Blockers
-Migration 000010 must be applied to Supabase by the user, followed by manual checks (see handoff).
+Migrations 000010 + 000011 must be applied to Supabase by the user, followed by manual checks (see handoff).

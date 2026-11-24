@@ -1,6 +1,5 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import { createAdminClient } from '@/lib/supabase/admin'
 
 interface Props {
   params: { token: string }
@@ -8,7 +7,7 @@ interface Props {
 
 // Validates and redeems a workspace invite token, then redirects to the workspace.
 // Unauthenticated users are redirected to /login?next=/invite/<token> by middleware
-// and land here again after auth. New (unapproved) users are auto-approved on redemption.
+// and land here again after auth. New (unapproved) users are approved by redeem_invite.
 export default async function InvitePage({ params }: Props) {
   const { token } = params
   const supabase = createClient()
@@ -37,19 +36,14 @@ export default async function InvitePage({ params }: Props) {
     return <InviteError message="This invite link has expired." />
   }
 
-  // Redeem via security-definer RPC (handles membership insert + used_at update)
+  // Redeem via security-definer RPC (approves the user, inserts membership and
+  // marks the invite used — all in one transaction, see ADR-002)
   const { data: workspaceId, error: redeemError } = await supabase
     .rpc('redeem_invite', { p_token: token })
 
   if (redeemError) {
     return <InviteError message={redeemError.message} />
   }
-
-  // Auto-approve the user — they were explicitly invited, no manual review needed
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  await (createAdminClient().from('profiles') as any)
-    .update({ approved: true })
-    .eq('id', user.id)
 
   redirect(`/workspace/${workspaceId}`)
 }
