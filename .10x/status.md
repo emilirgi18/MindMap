@@ -15,4 +15,5 @@ See `.10x/reviews/2026-11-24-discovery-review.md`.
 - [MED] No tests, no CI
 
 ## Blockers
-Migrations 000010 + 000011 must be applied to Supabase by the user, followed by manual checks (see handoff).
+Ready to ship (2026-11-24). `db push --dry-run` confirms only 000010 and 000011 are pending (000009 is already live). Full `next build` passes.
+Remaining: the user runs `supabase db push`, then `git push origin main`. Vercel then deploys the June work plus the security fixes. Manual checks are in the handoff.
