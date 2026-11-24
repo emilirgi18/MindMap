@@ -19,11 +19,11 @@ export default async function InvitePage({ params }: Props) {
   if (!user) redirect(`/login?next=/invite/${token}`)
 
   // Validate token is real before attempting redemption (gives a friendly error)
+  // Token lookup goes through an RPC — invites are not directly readable by
+  // non-owner/dm users (see ADR-001).
   const { data: invite, error: fetchError } = await supabase
-    .from('invites')
-    .select('workspace_id, expires_at, used_at')
-    .eq('token', token)
-    .single()
+    .rpc('get_invite', { p_token: token })
+    .maybeSingle<{ workspace_id: string; expires_at: string; used_at: string | null }>()
 
   if (fetchError || !invite) {
     return <InviteError message="This invite link is invalid or has expired." />

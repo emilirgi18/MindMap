@@ -264,6 +264,18 @@ export type Database = {
         Args: { p_token: string }
         Returns: string
       }
+      get_invite: {
+        Args: { p_token: string }
+        Returns: {
+          workspace_id: string
+          expires_at: string
+          used_at: string | null
+        }[]
+      }
+      can_access_collab_topic: {
+        Args: { p_topic: string }
+        Returns: boolean
+      }
       create_campaign_workspace: {
         Args: { p_name: string }
         Returns: string

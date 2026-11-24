@@ -28,8 +28,12 @@ export class SupabaseProvider {
     this.awareness = new Awareness(doc)
     this.onUpdate = onUpdate
 
+    // Private channel: Realtime checks the realtime.messages RLS policies
+    // (can_access_collab_topic) so only users who can read the note can
+    // send or receive its updates.
     this.channel = supabase.channel(`collab:${channelName}`, {
       config: {
+        private: true,
         broadcast: { self: false, ack: false },
       },
     })
@@ -88,6 +92,14 @@ export class SupabaseProvider {
       }
     )
 
+    void this.connect(supabase)
+  }
+
+  // Private channels are authorized with the user's JWT at join time, so make
+  // sure the realtime client has it before subscribing.
+  private async connect(supabase: SupabaseClient) {
+    await supabase.realtime.setAuth()
+    if (this.destroyed) return
     this.channel.subscribe()
   }
 
